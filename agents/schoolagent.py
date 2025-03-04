@@ -23,38 +23,6 @@ class SchoolAgent:
         self.path_time = random.uniform(5, 15)  # Hoelang agent dezelfde richting aanhoudt
         self.current_path_time = 0  # Teller voor huidige pad
 
-    def move(self):
-        """Beweeg de agent volgens huidige richting en snelheid."""
-        # Kijk of we van richting moeten veranderen
-        if random.random() < self.direction_change_prob:
-            self.direction += random.uniform(-0.5, 0.5)
-            self.direction %= 2 * math.pi
-            self.target_speed = random.uniform(0.02, self.max_speed)
-
-        # Bereken gewenste snelheid vector op basis van richting
-        target_vx = self.target_speed * math.cos(self.direction)
-        target_vy = self.target_speed * math.sin(self.direction)
-
-        # Geleidelijke aanpassing van huidige snelheid naar doelsnelheid (inertie)
-        current_vx, current_vy = self.velocity
-        new_vx = current_vx + (target_vx - current_vx) * self.acceleration
-        new_vy = current_vy + (target_vy - current_vy) * self.acceleration
-
-        # Update snelheid
-        self.velocity = (new_vx, new_vy)
-
-        # Update positie
-        new_x = self.position[0] + new_vx
-        new_y = self.position[1] + new_vy
-
-        # **Controleer of agent buiten de grenzen gaat**
-        if new_x < 0 or new_x > self.model.width or new_y < 0 or new_y > self.model.height:
-            self.model.remove_agent(self)  # Verwijder agent uit de simulatie
-            return  # Stop de functie zodat de positie niet meer wordt geüpdatet
-
-        # Update positie
-        self.position = (new_x, new_y)
-
     def move_continuous(self, dt):
         """Beweeg de agent volgens huidige richting en snelheid met delta tijd."""
         self.current_path_time += dt
@@ -77,14 +45,19 @@ class SchoolAgent:
         # Update snelheid
         self.velocity = (new_vx, new_vy)
 
-        # Update positie
+        # Nieuwe potentiële positie
         new_x = self.position[0] + new_vx * dt
         new_y = self.position[1] + new_vy * dt
 
-        # **Controleer of agent buiten de grenzen gaat**
-        if new_x < 0 or new_x > self.model.width or new_y < 0 or new_y > self.model.height:
-            self.model.remove_agent(self)  # Verwijder agent
-            return  # Stop verdere updates
+        if self.agent_type == "student":
+            # Studenten kunnen de simulatie verlaten
+            if new_x < 0 or new_x > self.model.width or new_y < 0 or new_y > self.model.height:
+                self.model.remove_agent(self)  # Verwijder student uit simulatie
+                return  # Stop verdere updates
+        else:
+            # Volwassenen mogen de grenzen niet overschrijden
+            new_x = max(0, min(new_x, self.model.width))
+            new_y = max(0, min(new_y, self.model.height))
 
         # Update positie
         self.position = (new_x, new_y)

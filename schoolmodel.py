@@ -3,10 +3,6 @@ import random
 from agents.adultagent import AdultAgent
 from agents.studentagent import StudentAgent
 
-# Agent types
-STUDENT = 0
-ADULT = 1
-
 
 class SchoolModel:
     """Model klasse voor de school simulatie."""
@@ -24,14 +20,14 @@ class SchoolModel:
         for i in range(self.num_students):
             x = random.uniform(5, self.width - 5)  # Kleine marge
             y = random.uniform(5, self.height - 5)  # Kleine marge
-            student = StudentAgent(i, self, (x, y), STUDENT)
+            student = StudentAgent(i, self, (x, y), "student")
             self.schedule.append(student)
 
         # Maak volwassen agenten
         for i in range(self.num_adults):
             x = random.uniform(5, self.width - 5)
             y = random.uniform(5, self.height - 5)
-            adult = AdultAgent(i + self.num_students, self, (x, y), ADULT)
+            adult = AdultAgent(i + self.num_students, self, (x, y), "adult")
             self.schedule.append(adult)
 
     def step(self):

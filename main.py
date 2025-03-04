@@ -92,7 +92,7 @@ def run_pygame_simulation():
             screen_y = int(y * scale_factor)
 
             # Kleur bepalen op basis van agent type
-            color = BLUE if agent.agent_type == STUDENT else RED
+            color = BLUE if agent.agent_type == 'student' else RED
 
             # Agent tekenen als cirkel
             pygame.draw.circle(screen, color, (screen_x, screen_y), 5)
@@ -106,8 +106,8 @@ def run_pygame_simulation():
         screen.blit(speed_text, (10, 40))
 
         # Toon agent aantallen
-        student_count = sum(1 for agent in model.schedule if agent.agent_type == STUDENT)
-        adult_count = sum(1 for agent in model.schedule if agent.agent_type == ADULT)
+        student_count = sum(1 for agent in model.schedule if agent.agent_type == 'student')
+        adult_count = sum(1 for agent in model.schedule if agent.agent_type == 'adult')
 
         count_text = font.render(f"Students: {student_count}, Adults: {adult_count}", True, BLACK)
         screen.blit(count_text, (10, 70))
