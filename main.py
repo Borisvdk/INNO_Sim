@@ -9,7 +9,8 @@ ADULT = 1
 # Simulation Parameters
 N_STUDENTS = 526
 N_ADULTS = 33
-
+#N_STUDENTS = 5
+#N_ADULTS = 2
 
 def run_pygame_simulation():
     """Simulatie met pygame met continue tijd."""
