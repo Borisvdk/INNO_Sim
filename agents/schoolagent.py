@@ -12,14 +12,14 @@ class SchoolAgent:
         self.position = position
         self.has_weapon = False
         self.awareness = 0.0
-        self.max_speed = 100
+        self.max_speed = 200
 
         # Parameters voor menselijkere beweging
         self.velocity = (0.0, 0.0)
         self.direction = random.uniform(0, 2 * math.pi)  # Richting in radialen
         self.direction_change_prob = 0.05  # Kans om richting te veranderen per stap
-        self.target_speed = random.uniform(0.02, self.max_speed)  # Doelsnelheid
-        self.acceleration = 0.01  # Hoe snel agent versnelt/vertraagt
+        self.target_speed = random.uniform(0.5 * self.max_speed, self.max_speed)  # Doelsnelheid
+        self.acceleration = 0.5  # Hoe snel agent versnelt/vertraagt
         self.path_time = random.uniform(5, 15)  # Hoelang agent dezelfde richting aanhoudt
         self.current_path_time = 0  # Teller voor huidige pad
 
