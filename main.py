@@ -1,4 +1,5 @@
 from schoolmodel import SchoolModel
+import time
 import pygame
 
 # Agent types
@@ -9,8 +10,10 @@ ADULT = 1
 N_STUDENTS = 526
 N_ADULTS = 33
 
+
 def run_pygame_simulation():
-    """Simulatie met pygame voor betere realtime visualisatie."""
+    """Simulatie met pygame met continue tijd."""
+    import pygame
 
     # Maak een nieuw model
     model = SchoolModel(n_students=N_STUDENTS, n_adults=N_ADULTS, width=100, height=100)
@@ -35,9 +38,15 @@ def run_pygame_simulation():
     # Font voor tekst
     font = pygame.font.SysFont(None, 24)
 
-    # Klok voor framerate
+    # Tijdvariabelen voor continue simulatie
     clock = pygame.time.Clock()
-    step_count = 0
+    last_update_time = time.time()
+    current_time = time.time()
+    simulation_time = 0.0  # Totale gesimuleerde tijd in seconden
+    sim_speed = 1.0  # Simulatiesnelheid factor (1.0 = realtime)
+
+    # Elke tijdstap in de simulatie vertegenwoordigt 5 seconden in de werkelijkheid
+    SECONDS_PER_STEP = 5.0
 
     running = True
     while running:
@@ -45,10 +54,31 @@ def run_pygame_simulation():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.KEYDOWN:
+                # Simulatiesnelheid aanpassen met toetsen
+                if event.key == pygame.K_UP:
+                    sim_speed *= 2.0  # Verdubbel snelheid
+                elif event.key == pygame.K_DOWN:
+                    sim_speed /= 2.0  # Halveer snelheid
+                elif event.key == pygame.K_SPACE:
+                    # Reset naar normale snelheid
+                    sim_speed = 1.0
 
-        # Simulatiestap uitvoeren
-        model.step()
-        step_count += 1
+        # Tijd berekenen
+        current_time = time.time()
+        dt = current_time - last_update_time  # Verstreken reële tijd sinds laatste update
+        last_update_time = current_time
+
+        # Gesimuleerde tijd bijwerken met snelheidsfactor
+        sim_dt = dt * sim_speed
+        simulation_time += sim_dt
+
+        # Continue update van het model met delta tijd (in simulatie eenheden)
+        # We delen door SECONDS_PER_STEP omdat elke 'stap' 5 seconden voorstelt
+        model.step_continuous(sim_dt / SECONDS_PER_STEP)
+
+        # Bereken hoeveel stappen er zijn verlopen (voor weergave)
+        step_count = int(simulation_time / SECONDS_PER_STEP)
 
         # Scherm wissen
         screen.fill(WHITE)
@@ -67,22 +97,30 @@ def run_pygame_simulation():
             # Agent tekenen als cirkel
             pygame.draw.circle(screen, color, (screen_x, screen_y), 5)
 
-        # Toon stap nummer
-        step_text = font.render(f"Step: {step_count}", True, BLACK)
-        screen.blit(step_text, (10, 10))
+        # Toon simulatie informatie
+        time_text = font.render(f"Sim Time: {simulation_time:.1f}s (Step {step_count})", True, BLACK)
+        screen.blit(time_text, (10, 10))
+
+        # Toon simulatiesnelheid
+        speed_text = font.render(f"Speed: {sim_speed:.1f}x", True, BLACK)
+        screen.blit(speed_text, (10, 40))
 
         # Toon agent aantallen
         student_count = sum(1 for agent in model.schedule if agent.agent_type == STUDENT)
         adult_count = sum(1 for agent in model.schedule if agent.agent_type == ADULT)
 
         count_text = font.render(f"Students: {student_count}, Adults: {adult_count}", True, BLACK)
-        screen.blit(count_text, (10, 40))
+        screen.blit(count_text, (10, 70))
+
+        # Toon help informatie
+        help_text = font.render("↑/↓: Speed up/down | Space: Reset speed", True, BLACK)
+        screen.blit(help_text, (10, screen_height - 30))
 
         # Scherm updaten
         pygame.display.flip()
 
-        # Framerate beperken tot 30 fps
-        clock.tick(30)
+        # Framerate beperken tot 60 fps
+        clock.tick(60)
 
     pygame.quit()
 
