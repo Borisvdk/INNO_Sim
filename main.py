@@ -1,4 +1,5 @@
 from schoolmodel import SchoolModel
+import pygame
 
 # Agent types
 STUDENT = 0
@@ -10,7 +11,6 @@ N_ADULTS = 33
 
 def run_pygame_simulation():
     """Simulatie met pygame voor betere realtime visualisatie."""
-    import pygame
 
     # Maak een nieuw model
     model = SchoolModel(n_students=N_STUDENTS, n_adults=N_ADULTS, width=100, height=100)

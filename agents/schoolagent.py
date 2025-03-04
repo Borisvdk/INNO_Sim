@@ -11,7 +11,7 @@ class SchoolAgent:
         self.position = position
         self.has_weapon = False
         self.awareness = 0.0
-        self.max_speed = 0.5  # Verlaagd voor betere visualisatie
+        self.max_speed = 0.2  # Verlaagd voor betere visualisatie
 
     def move(self):
         """Beweeg de agent volgens willekeurige beweging."""
