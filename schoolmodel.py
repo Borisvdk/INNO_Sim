@@ -3,17 +3,22 @@ import random
 from agents.adultagent import AdultAgent
 from agents.studentagent import StudentAgent
 
+# Agent types
+STUDENT = 0
+ADULT = 1
+
 
 class SchoolModel:
     """Model klasse voor de school simulatie."""
 
-    def __init__(self, n_students=50, n_adults=10, width=100, height=100, STUDENT=0, ADULT=1 ):
+    def __init__(self, n_students=50, n_adults=10, width=100, height=100):
         self.num_students = n_students
         self.num_adults = n_adults
         self.width = width
         self.height = height
         self.running = True
         self.schedule = []  # Lijst van alle agenten
+        self.simulation_time = 0.0  # Totale gesimuleerde tijd
 
         # Maak student agenten
         for i in range(self.num_students):
@@ -30,8 +35,20 @@ class SchoolModel:
             self.schedule.append(adult)
 
     def step(self):
-        """Voer één tijdstap uit in de simulatie."""
+        """Voer één tijdstap uit in de simulatie (discrete tijd)."""
         # Activeer alle agenten in willekeurige volgorde
         random.shuffle(self.schedule)
         for agent in self.schedule:
             agent.step()
+
+        self.simulation_time += 1.0  # Verhoog tijd met één tijdstap
+
+    def step_continuous(self, dt):
+        """Voer een continue tijdstap uit met delta tijd dt."""
+        # Update de totale simulatietijd
+        self.simulation_time += dt
+
+        # Activeer alle agenten in willekeurige volgorde met delta tijd
+        random.shuffle(self.schedule)
+        for agent in self.schedule:
+            agent.step_continuous(dt)
