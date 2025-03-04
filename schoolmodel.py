@@ -52,3 +52,8 @@ class SchoolModel:
         random.shuffle(self.schedule)
         for agent in self.schedule:
             agent.step_continuous(dt)
+
+    def remove_agent(self, agent):
+        """Verwijder een agent uit de simulatie."""
+        if agent in self.schedule:
+            self.schedule.remove(agent)

@@ -17,6 +17,10 @@ class SchoolAgent:
         # Parameters voor menselijkere beweging
         self.velocity = (0.0, 0.0)
         self.direction = random.uniform(0, 2 * math.pi)  # Richting in radialen
+        self.direction_change_prob = 0.05  # Kans om richting te veranderen per stap
+        self.target_speed = random.uniform(0.75 * self.max_speed, self.max_speed)  # Doelsnelheid
+        self.acceleration = 0.5  # Hoe snel agent versnelt/vertraagt
+        self.path_time = random.uniform(5, 15)  # Hoelang agent dezelfde richting aanhoudt
         self.target_speed = random.uniform(0.5, self.max_speed)  # Doelsnelheid
         self.acceleration = 1
 
@@ -36,6 +40,20 @@ class SchoolAgent:
             self.idle_duration = random.uniform(15, 40)  # VERHOOGD: 15-40 seconden stilstand
             self.path_time = random.uniform(15, 40)  # VERHOOGD: 15-40 seconden doorlopen
 
+        # Update snelheid
+        self.velocity = (new_vx, new_vy)
+
+        # Update positie
+        new_x = self.position[0] + new_vx
+        new_y = self.position[1] + new_vy
+
+        # **Controleer of agent buiten de grenzen gaat**
+        if new_x < 0 or new_x > self.model.width or new_y < 0 or new_y > self.model.height:
+            self.model.remove_agent(self)  # Verwijder agent uit de simulatie
+            return  # Stop de functie zodat de positie niet meer wordt geüpdatet
+
+        # Update positie
+        self.position = (new_x, new_y)
 
     def move_continuous(self, dt):
         """Beweeg de agent volgens huidige richting en snelheid met delta tijd."""
@@ -76,11 +94,11 @@ class SchoolAgent:
                     self.idle_duration = random.uniform(15, 40)
                 return
 
-        # Bereken gewenste snelheid vector op basis van richting
+        # Bereken snelheid op basis van richting
         target_vx = self.target_speed * math.cos(self.direction)
         target_vy = self.target_speed * math.sin(self.direction)
 
-        # Geleidelijke aanpassing van huidige snelheid naar doelsnelheid (inertie)
+        # Geleidelijke snelheidsovergang
         current_vx, current_vy = self.velocity
         new_vx = current_vx + (target_vx - current_vx) * self.acceleration * dt * 5
         new_vy = current_vy + (target_vy - current_vy) * self.acceleration * dt * 5
@@ -88,22 +106,14 @@ class SchoolAgent:
         # Update snelheid
         self.velocity = (new_vx, new_vy)
 
-        # Update positie met delta tijd
+        # Update positie
         new_x = self.position[0] + new_vx * dt
         new_y = self.position[1] + new_vy * dt
 
-        # Zorg dat agenten binnen de grenzen blijven
-        if new_x <= 0 or new_x >= self.model.width:
-            self.direction = math.pi - self.direction  # Spiegel horizontaal
-            self.velocity = (-new_vx, new_vy)
-            # Corrigeer positie
-            new_x = max(0, min(self.model.width, new_x))
-
-        if new_y <= 0 or new_y >= self.model.height:
-            self.direction = 2 * math.pi - self.direction  # Spiegel verticaal
-            self.velocity = (new_vx, -new_vy)
-            # Corrigeer positie
-            new_y = max(0, min(self.model.height, new_y))
+        # **Controleer of agent buiten de grenzen gaat**
+        if new_x < 0 or new_x > self.model.width or new_y < 0 or new_y > self.model.height:
+            self.model.remove_agent(self)  # Verwijder agent
+            return  # Stop verdere updates
 
         # Update positie
         self.position = (new_x, new_y)
