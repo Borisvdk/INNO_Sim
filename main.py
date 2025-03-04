@@ -1,7 +1,3 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-
 from schoolmodel import SchoolModel
 
 # Agent types
