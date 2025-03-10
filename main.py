@@ -9,20 +9,25 @@ ADULT = 1
 # Simulation Parameters
 N_STUDENTS = 526
 N_ADULTS = 33
+#N_STUDENTS = 5
+#N_ADULTS = 2
 
+# School dimensions - INCREASED SIZE with proper aspect ratio
+SCHOOL_WIDTH = 600  # Match the aspect ratio of the screen (1.2:1)
+SCHOOL_HEIGHT = 500
 
 def run_pygame_simulation():
     """Simulatie met pygame met continue tijd."""
     import pygame
 
-    # Maak een nieuw model
-    model = SchoolModel(n_students=N_STUDENTS, n_adults=N_ADULTS, width=100, height=100)
+    # Maak een nieuw model met grotere afmetingen
+    model = SchoolModel(n_students=N_STUDENTS, n_adults=N_ADULTS, width=SCHOOL_WIDTH, height=SCHOOL_HEIGHT)
 
     # Pygame initialiseren
     pygame.init()
 
     # Schermgrootte en schaling instellen
-    screen_width, screen_height = 800, 800
+    screen_width, screen_height = 1200, 1000
     scale_factor = min(screen_width / model.width, screen_height / model.height)
 
     # Pygame scherm maken
@@ -95,7 +100,7 @@ def run_pygame_simulation():
             color = BLUE if agent.agent_type == 'student' else RED
 
             # Agent tekenen als cirkel
-            pygame.draw.circle(screen, color, (screen_x, screen_y), 5)
+            pygame.draw.circle(screen, color, (screen_x, screen_y), 4)  # Iets grotere cirkels voor de grotere scherm
 
         # Toon simulatie informatie
         time_text = font.render(f"Sim Time: {simulation_time:.1f}s (Step {step_count})", True, BLACK)
