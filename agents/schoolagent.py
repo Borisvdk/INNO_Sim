@@ -21,21 +21,21 @@ class SchoolAgent:
         self.target_speed = random.uniform(0.75 * self.max_speed, self.max_speed)  # Doelsnelheid
         self.acceleration = 0.5  # Hoe snel agent versnelt/vertraagt
 
-        # Tijdgebaseerde richtingsverandering - langere periodes
-        self.path_time = random.uniform(10, 30)  # VERHOOGD: veel langere loopperiodes (10-30 sec)
+        # Tijdgebaseerde richtingsverandering - veel kortere periodes voor merkbare verandering
+        self.path_time = random.uniform(0.5, 2)  # Veel kortere periode zodat richtingsverandering veel vaker plaatsvindt
         self.current_path_time = 0  # Teller voor huidige pad
 
-        # Parameters voor stilstand - langere periodes
+        # Parameters voor stilstand - kortere periodes en hogere kans
         self.is_idle = False
-        self.idle_prob = 0.4  # Kans om stil te gaan staan bij richtingverandering
+        self.idle_prob = 0.5  # 50% kans om stil te gaan staan bij richtingverandering
         self.idle_time = 0  # Huidige tijd dat agent stil staat
-        self.idle_duration = random.uniform(8, 20)  # VERHOOGD: veel langere stilstandperiodes (8-20 sec)
+        self.idle_duration = random.uniform(1, 3)  # Veel kortere stilstandperiodes
 
         # Volwassenen staan vaker en langer stil dan studenten
         if agent_type == 1:  # ADULT
-            self.idle_prob = 0.6  # 60% kans om stil te staan bij richtingverandering
-            self.idle_duration = random.uniform(15, 40)  # VERHOOGD: 15-40 seconden stilstand
-            self.path_time = random.uniform(15, 40)  # VERHOOGD: 15-40 seconden doorlopen
+            self.idle_prob = 0.7  # 70% kans om stil te staan bij richtingverandering
+            self.idle_duration = random.uniform(1.5, 4)  # Kortere stilstandperiodes dan voorheen
+            self.path_time = random.uniform(1, 3)  # Kortere periode voor richtingsverandering
 
     def move(self):
         """Beweeg de agent volgens huidige richting en snelheid."""
@@ -45,7 +45,7 @@ class SchoolAgent:
             self.idle_time += 1
             if self.idle_time >= self.idle_duration:
                 self.is_idle = False
-                self.direction = random.uniform(0, 2 * math.pi)
+                self.direction = random.uniform(0, 2 * math.pi)  # Volledig nieuwe richting
                 self.target_speed = random.uniform(0.5, self.max_speed)
             return
 
@@ -54,12 +54,12 @@ class SchoolAgent:
         if self.current_path_time >= self.path_time:
             # Reset pad timer
             self.current_path_time = 0
-            self.path_time = random.uniform(10, 30)
+            self.path_time = random.uniform(0.5, 2)
             if self.agent_type == 1:
-                self.path_time = random.uniform(15, 40)
+                self.path_time = random.uniform(1, 3)
 
-            # Verander richting
-            self.direction += random.uniform(-1.0, 1.0)
+            # Verander richting met een zeer significante verandering (tot 180 graden)
+            self.direction += random.uniform(-math.pi, math.pi)  # Tot 180 graden hoekverandering
             self.direction %= 2 * math.pi
             self.target_speed = random.uniform(0.5, self.max_speed)
 
@@ -68,9 +68,9 @@ class SchoolAgent:
                 self.is_idle = True
                 self.velocity = (0, 0)
                 self.idle_time = 0
-                self.idle_duration = random.uniform(8, 20)
+                self.idle_duration = random.uniform(1, 3)
                 if self.agent_type == 1:  # ADULT
-                    self.idle_duration = random.uniform(15, 40)
+                    self.idle_duration = random.uniform(1.5, 4)
                 return
 
         # Bereken gewenste snelheid vector op basis van richting
@@ -89,7 +89,7 @@ class SchoolAgent:
         new_x = self.position[0] + new_vx
         new_y = self.position[1] + new_vy
 
-        # **Controleer of agent buiten de grenzen gaat**
+        # Controleer of agent buiten de grenzen gaat
         if new_x < 0 or new_x > self.model.width or new_y < 0 or new_y > self.model.height:
             self.model.remove_agent(self)  # Verwijder agent uit de simulatie
             return  # Stop de functie zodat de positie niet meer wordt geüpdatet
@@ -106,7 +106,7 @@ class SchoolAgent:
                 # Stilstandperiode is voorbij
                 self.is_idle = False
                 # Kies een nieuwe richting en snelheid
-                self.direction = random.uniform(0, 2 * math.pi)
+                self.direction = random.uniform(0, 2 * math.pi)  # Volledig nieuwe richting
                 self.target_speed = random.uniform(0.5, self.max_speed)
                 self.current_path_time = 0
             return
@@ -116,12 +116,12 @@ class SchoolAgent:
         if self.current_path_time >= self.path_time:
             # Reset pad timer
             self.current_path_time = 0
-            self.path_time = random.uniform(10, 30)
+            self.path_time = random.uniform(0.5, 2)
             if self.agent_type == 1:
-                self.path_time = random.uniform(15, 40)
+                self.path_time = random.uniform(1, 3)
 
-            # Verander richting
-            self.direction += random.uniform(-1.0, 1.0)
+            # Verander richting met een zeer significante verandering (tot 180 graden)
+            self.direction += random.uniform(-math.pi, math.pi)  # Tot 180 graden hoekverandering
             self.direction %= 2 * math.pi
             self.target_speed = random.uniform(0.5, self.max_speed)
 
@@ -131,9 +131,9 @@ class SchoolAgent:
                 self.velocity = (0, 0)
                 self.idle_time = 0
                 # Reset idle duur voor variatie bij elke stilstand
-                self.idle_duration = random.uniform(8, 20)
+                self.idle_duration = random.uniform(1, 3)
                 if self.agent_type == 1:  # ADULT
-                    self.idle_duration = random.uniform(15, 40)
+                    self.idle_duration = random.uniform(1.5, 4)
                 return
 
         # Bereken snelheid op basis van richting
@@ -152,10 +152,10 @@ class SchoolAgent:
         new_x = self.position[0] + new_vx * dt
         new_y = self.position[1] + new_vy * dt
 
-        # **Controleer of agent buiten de grenzen gaat**
+        # Controleer of agent buiten de grenzen gaat
         if new_x < 0 or new_x > self.model.width or new_y < 0 or new_y > self.model.height:
-            self.model.remove_agent(self)  # Verwijder agent
-            return  # Stop verdere updates
+            self.model.remove_agent(self)  # Verwijder agent uit de simulatie
+            return  # Stop de functie zodat de positie niet meer wordt geüpdatet
 
         # Update positie
         self.position = (new_x, new_y)
