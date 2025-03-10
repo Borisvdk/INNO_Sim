@@ -9,12 +9,12 @@ ADULT = 1
 # Simulation Parameters
 N_STUDENTS = 526
 N_ADULTS = 33
-#N_STUDENTS = 5
-#N_ADULTS = 2
+N_STUDENTS = 50
+N_ADULTS = 20
 
 # School dimensions - INCREASED SIZE with proper aspect ratio
 SCHOOL_WIDTH = 600  # Match the aspect ratio of the screen (1.2:1)
-SCHOOL_HEIGHT = 500
+SCHOOL_HEIGHT = 400
 
 def run_pygame_simulation():
     """Simulatie met pygame met continue tijd."""
@@ -27,7 +27,7 @@ def run_pygame_simulation():
     pygame.init()
 
     # Schermgrootte en schaling instellen
-    screen_width, screen_height = 1200, 1000
+    screen_width, screen_height = 1200, 800
     scale_factor = min(screen_width / model.width, screen_height / model.height)
 
     # Pygame scherm maken
@@ -49,9 +49,6 @@ def run_pygame_simulation():
     current_time = time.time()
     simulation_time = 0.0  # Totale gesimuleerde tijd in seconden
     sim_speed = 1.0  # Simulatiesnelheid factor (1.0 = realtime)
-
-    # Elke tijdstap in de simulatie vertegenwoordigt 5 seconden in de werkelijkheid
-    SECONDS_PER_STEP = 5.0
 
     running = True
     while running:
@@ -80,10 +77,7 @@ def run_pygame_simulation():
 
         # Continue update van het model met delta tijd (in simulatie eenheden)
         # We delen door SECONDS_PER_STEP omdat elke 'stap' 5 seconden voorstelt
-        model.step_continuous(sim_dt / SECONDS_PER_STEP)
-
-        # Bereken hoeveel stappen er zijn verlopen (voor weergave)
-        step_count = int(simulation_time / SECONDS_PER_STEP)
+        model.step_continuous(sim_dt)
 
         # Scherm wissen
         screen.fill(WHITE)
@@ -103,7 +97,7 @@ def run_pygame_simulation():
             pygame.draw.circle(screen, color, (screen_x, screen_y), 4)  # Iets grotere cirkels voor de grotere scherm
 
         # Toon simulatie informatie
-        time_text = font.render(f"Sim Time: {simulation_time:.1f}s (Step {step_count})", True, BLACK)
+        time_text = font.render(f"Sim Time: {simulation_time:.1f}s", True, BLACK)
         screen.blit(time_text, (10, 10))
 
         # Toon simulatiesnelheid
