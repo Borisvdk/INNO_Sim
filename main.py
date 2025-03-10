@@ -12,12 +12,16 @@ N_ADULTS = 33
 #N_STUDENTS = 5
 #N_ADULTS = 2
 
+# School dimensions - INCREASED SIZE
+SCHOOL_WIDTH = 500  # Changed from 100 to 500
+SCHOOL_HEIGHT = 500  # Changed from 100 to 500
+
 def run_pygame_simulation():
     """Simulatie met pygame met continue tijd."""
     import pygame
 
-    # Maak een nieuw model
-    model = SchoolModel(n_students=N_STUDENTS, n_adults=N_ADULTS, width=100, height=100)
+    # Maak een nieuw model met grotere afmetingen
+    model = SchoolModel(n_students=N_STUDENTS, n_adults=N_ADULTS, width=SCHOOL_WIDTH, height=SCHOOL_HEIGHT)
 
     # Pygame initialiseren
     pygame.init()
@@ -96,7 +100,7 @@ def run_pygame_simulation():
             color = BLUE if agent.agent_type == STUDENT else RED
 
             # Agent tekenen als cirkel
-            pygame.draw.circle(screen, color, (screen_x, screen_y), 5)
+            pygame.draw.circle(screen, color, (screen_x, screen_y), 3)  # Kleinere cirkels (was 5)
 
         # Toon simulatie informatie
         time_text = font.render(f"Sim Time: {simulation_time:.1f}s (Step {step_count})", True, BLACK)

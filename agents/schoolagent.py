@@ -12,7 +12,9 @@ class SchoolAgent:
         self.position = position
         self.has_weapon = False
         self.awareness = 0.0
-        self.max_speed = 100.0
+
+        # Aangepaste snelheid voor grotere school
+        self.max_speed = 500.0  # Verhoogd van 100 naar 500 voor grotere school
 
         # Parameters voor menselijkere beweging
         self.velocity = (0.0, 0.0)
@@ -22,7 +24,8 @@ class SchoolAgent:
         self.acceleration = 0.5  # Hoe snel agent versnelt/vertraagt
 
         # Tijdgebaseerde richtingsverandering - veel kortere periodes voor merkbare verandering
-        self.path_time = random.uniform(0.5, 2)  # Veel kortere periode zodat richtingsverandering veel vaker plaatsvindt
+        self.path_time = random.uniform(0.5,
+                                        2)  # Veel kortere periode zodat richtingsverandering veel vaker plaatsvindt
         self.current_path_time = 0  # Teller voor huidige pad
 
         # Parameters voor stilstand - kortere periodes en hogere kans
