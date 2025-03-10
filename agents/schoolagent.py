@@ -20,9 +20,6 @@ class SchoolAgent:
         self.direction_change_prob = 0.05  # Kans om richting te veranderen per stap
         self.target_speed = random.uniform(0.75 * self.max_speed, self.max_speed)  # Doelsnelheid
         self.acceleration = 0.5  # Hoe snel agent versnelt/vertraagt
-        self.path_time = random.uniform(5, 15)  # Hoelang agent dezelfde richting aanhoudt
-        self.target_speed = random.uniform(0.5, self.max_speed)  # Doelsnelheid
-        self.acceleration = 1
 
         # Tijdgebaseerde richtingsverandering - langere periodes
         self.path_time = random.uniform(10, 30)  # VERHOOGD: veel langere loopperiodes (10-30 sec)
@@ -39,6 +36,51 @@ class SchoolAgent:
             self.idle_prob = 0.6  # 60% kans om stil te staan bij richtingverandering
             self.idle_duration = random.uniform(15, 40)  # VERHOOGD: 15-40 seconden stilstand
             self.path_time = random.uniform(15, 40)  # VERHOOGD: 15-40 seconden doorlopen
+
+    def move(self):
+        """Beweeg de agent volgens huidige richting en snelheid."""
+        # Als agent stilstaat, doe niets
+        if self.is_idle:
+            # Discreter tijdsverloop voor idle tijd in niet-continuous mode
+            self.idle_time += 1
+            if self.idle_time >= self.idle_duration:
+                self.is_idle = False
+                self.direction = random.uniform(0, 2 * math.pi)
+                self.target_speed = random.uniform(0.5, self.max_speed)
+            return
+
+        # Bepalen of we van richting veranderen (tijdsgebaseerd)
+        self.current_path_time += 1
+        if self.current_path_time >= self.path_time:
+            # Reset pad timer
+            self.current_path_time = 0
+            self.path_time = random.uniform(10, 30)
+            if self.agent_type == 1:
+                self.path_time = random.uniform(15, 40)
+
+            # Verander richting
+            self.direction += random.uniform(-1.0, 1.0)
+            self.direction %= 2 * math.pi
+            self.target_speed = random.uniform(0.5, self.max_speed)
+
+            # Bepaal of agent stil gaat staan
+            if random.random() < self.idle_prob:
+                self.is_idle = True
+                self.velocity = (0, 0)
+                self.idle_time = 0
+                self.idle_duration = random.uniform(8, 20)
+                if self.agent_type == 1:  # ADULT
+                    self.idle_duration = random.uniform(15, 40)
+                return
+
+        # Bereken gewenste snelheid vector op basis van richting
+        target_vx = self.target_speed * math.cos(self.direction)
+        target_vy = self.target_speed * math.sin(self.direction)
+
+        # Geleidelijke aanpassing van huidige snelheid naar doelsnelheid (inertie)
+        current_vx, current_vy = self.velocity
+        new_vx = current_vx + (target_vx - current_vx) * self.acceleration
+        new_vy = current_vy + (target_vy - current_vy) * self.acceleration
 
         # Update snelheid
         self.velocity = (new_vx, new_vy)
