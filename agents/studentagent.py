@@ -25,17 +25,28 @@ class StudentAgent(SchoolAgent):
             self.shoot_if_possible()
 
     def shoot_if_possible(self):
-        """Attempt to shoot a nearby agent if enough time has passed."""
+        """Attempt to shoot a nearby agent if the shooting interval has passed."""
         current_time = self.model.simulation_time
         if current_time - self.last_shot_time >= self.shooting_interval:
+            # Find agents within shooting range
             nearby_agents = self.get_nearby_agents(self.shooting_range)
             if nearby_agents:
+                # Select a random target
                 target = random.choice(nearby_agents)
+
+                # Play gunshot sound (shot is fired)
+                self.model.gunshot_sound.play()
+
+                # Attempt to hit the target
                 if random.random() < self.hit_probability:
+                    # Play kill sound (shot hits and kills)
+                    self.model.kill_sound.play()
                     print(f"Shooter {self.unique_id} hit agent {target.unique_id}")
                     self.model.remove_agent(target)
                 else:
                     print(f"Shooter {self.unique_id} missed")
+
+                # Update the last shot time
                 self.last_shot_time = current_time
 
     def get_nearby_agents(self, radius):

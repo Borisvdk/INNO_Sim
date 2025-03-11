@@ -26,6 +26,18 @@ def run_pygame_simulation():
     # Pygame initialiseren
     pygame.init()
 
+    # Load sound files
+    gunshot_sound = pygame.mixer.Sound("gunshot.wav")
+    kill_sound = pygame.mixer.Sound("kill.wav")
+
+    # Optional: Adjust volume (0.0 = silent, 1.0 = full volume)
+    gunshot_sound.set_volume(0.5)  # 50% volume
+    kill_sound.set_volume(0.5)  # 50% volume
+
+    # Attach sounds to the model for agent access
+    model.gunshot_sound = gunshot_sound
+    model.kill_sound = kill_sound
+
     # Schermgrootte en schaling instellen
     screen_width, screen_height = 1200, 800
     scale_factor = min(screen_width / model.width, screen_height / model.height)
