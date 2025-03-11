@@ -16,12 +16,11 @@ N_ADULTS = 20
 SCHOOL_WIDTH = 600
 SCHOOL_HEIGHT = 400
 
-
 def run_pygame_simulation():
-    """Simulatie met pygame met continue tijd."""
+    """Simulatie met pygame met continue tijd, inclusief een shooter."""
     import pygame
 
-    # Maak een nieuw model met grotere afmetingen
+    # Maak een nieuw model met grotere afmetingen en een shooter
     model = SchoolModel(n_students=N_STUDENTS, n_adults=N_ADULTS, width=SCHOOL_WIDTH, height=SCHOOL_HEIGHT)
 
     # Pygame initialiseren
@@ -33,17 +32,16 @@ def run_pygame_simulation():
 
     # Pygame scherm maken
     screen = pygame.display.set_mode((screen_width, screen_height))
-    pygame.display.set_caption("School Simulation")
+    pygame.display.set_caption("School Shooter Simulation")
 
     # Kleuren definiëren
     WHITE = (255, 255, 255)
-    BLUE = (0, 0, 255)  # Students
-    RED = (255, 0, 0)  # Adults
-    BLACK = (0, 0, 0)  # Walls
-
-    # Highlight colors for agents with weapons (if implemented)
-    ARMED_STUDENT_COLOR = (100, 100, 255)  # Lighter blue
-    ARMED_ADULT_COLOR = (255, 100, 100)  # Lighter red
+    BLUE = (0, 0, 255)    # Normale studenten
+    RED = (255, 0, 0)     # Volwassenen
+    BLACK = (0, 0, 0)     # Muren
+    GREEN = (0, 255, 0)   # Shooter (onderscheiden van andere agenten)
+    ARMED_STUDENT_COLOR = (100, 100, 255)  # Lichter blauw voor gewapende studenten (niet-shooter)
+    ARMED_ADULT_COLOR = (255, 100, 100)    # Lichter rood voor gewapende volwassenen
 
     # Font voor tekst
     font = pygame.font.SysFont(None, 24)
@@ -58,16 +56,16 @@ def run_pygame_simulation():
     # Performance tracking
     frame_times = []
     last_fps_update = time.time()
-    fps_update_interval = 1.0  # Update FPS display every second
-    current_fps = 0.0  # Initialize FPS counter
+    fps_update_interval = 1.0  # Update FPS display elke seconde
+    current_fps = 0.0  # Initialiseer FPS teller
 
-    # Import needed classes here to avoid circular imports
+    # Importeer klassen om circulaire imports te vermijden
     from agents.studentagent import StudentAgent
     from agents.adultagent import AdultAgent
 
     running = True
     while running:
-        # Measure frame start time for performance tracking
+        # Meet frametijd voor performance tracking
         frame_start_time = time.time()
 
         # Events afhandelen
@@ -75,24 +73,20 @@ def run_pygame_simulation():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
-                # Simulatiesnelheid aanpassen met toetsen
                 if event.key == pygame.K_UP:
                     sim_speed *= 2.0  # Verdubbel snelheid
                 elif event.key == pygame.K_DOWN:
                     sim_speed /= 2.0  # Halveer snelheid
                 elif event.key == pygame.K_SPACE:
-                    # Reset naar normale snelheid
-                    sim_speed = 1.0
-                # Add student with 's' key
+                    sim_speed = 1.0  # Reset naar normale snelheid
                 elif event.key == pygame.K_s:
-                    for _ in range(10):  # Add 10 students at once
+                    for _ in range(10):  # Voeg 10 studenten toe
                         x = random.uniform(5, model.width - 5)
                         y = random.uniform(5, model.height - 5)
                         student = StudentAgent(len(model.schedule), model, (x, y), "student", model.schedule)
                         model.schedule.append(student)
-                # Add adult with 'a' key
                 elif event.key == pygame.K_a:
-                    for _ in range(5):  # Add 5 adults at once
+                    for _ in range(5):  # Voeg 5 volwassenen toe
                         x = random.uniform(5, model.width - 5)
                         y = random.uniform(5, model.height - 5)
                         adult = AdultAgent(len(model.schedule), model, (x, y), "adult", model.schedule)
@@ -100,14 +94,14 @@ def run_pygame_simulation():
 
         # Tijd berekenen
         current_time = time.time()
-        dt = current_time - last_update_time  # Verstreken reële tijd sinds laatste update
+        dt = current_time - last_update_time
         last_update_time = current_time
 
         # Gesimuleerde tijd bijwerken met snelheidsfactor
         sim_dt = dt * sim_speed
         simulation_time += sim_dt
 
-        # Continue update van het model met delta tijd (in simulatie eenheden)
+        # Continue update van het model
         model.step_continuous(sim_dt)
 
         # Scherm wissen
@@ -130,33 +124,34 @@ def run_pygame_simulation():
         # Agenten tekenen
         for agent in model.schedule:
             x, y = agent.position
-
-            # Schalen naar schermcoördinaten
             screen_x = int(x * scale_factor)
             screen_y = int(y * scale_factor)
-
-            # Determine color based on agent type and armed status
-            if agent.agent_type == 'student':
-                color = ARMED_STUDENT_COLOR if getattr(agent, 'has_weapon', False) else BLUE
-            else:  # adult
-                color = ARMED_ADULT_COLOR if getattr(agent, 'has_weapon', False) else RED
-
-            # Draw agent as circle with proper radius
-            # Use agent's actual radius from the physics model
             scaled_radius = int(agent.radius * scale_factor)
+
+            # Bepaal kleur gebaseerd op agenttype en status
+            if agent.agent_type == "student":
+                if getattr(agent, "is_shooter", False):
+                    color = GREEN  # Shooter in groen
+                elif getattr(agent, "has_weapon", False):
+                    color = ARMED_STUDENT_COLOR
+                else:
+                    color = BLUE
+            else:  # adult
+                color = ARMED_ADULT_COLOR if getattr(agent, "has_weapon", False) else RED
+
+            # Teken agent als cirkel
             pygame.draw.circle(screen, color, (screen_x, screen_y), scaled_radius)
 
-            # Draw direction indicator (a small line showing where agent is heading)
-            if hasattr(agent, 'velocity'):
+            # Teken richtingaanwijzer
+            if hasattr(agent, "velocity"):
                 vx, vy = agent.velocity
                 speed = math.sqrt(vx * vx + vy * vy)
                 if speed > 0:
-                    # Normalize and scale
                     direction_x = vx / speed * (scaled_radius + 2)
                     direction_y = vy / speed * (scaled_radius + 2)
                     pygame.draw.line(
                         screen,
-                        (0, 0, 0),
+                        BLACK,
                         (screen_x, screen_y),
                         (screen_x + direction_x, screen_y + direction_y),
                         1
@@ -167,47 +162,35 @@ def run_pygame_simulation():
         frame_time = frame_end_time - frame_start_time
         frame_times.append(frame_time)
 
-        # Calculate FPS over the last second
+        # Bereken FPS over de laatste seconde
         if current_time - last_fps_update > fps_update_interval:
             if frame_times:
                 avg_frame_time = sum(frame_times) / len(frame_times)
                 current_fps = 1.0 / avg_frame_time if avg_frame_time > 0 else 0
-                frame_times = []  # Reset for next interval
+                frame_times = []
                 last_fps_update = current_time
 
-        # Toon simulatie informatie
+        # Toon simulatie-informatie
         time_text = font.render(f"Sim Time: {simulation_time:.1f}s", True, BLACK)
         screen.blit(time_text, (10, 10))
-
-        # Toon simulatiesnelheid
         speed_text = font.render(f"Speed: {sim_speed:.1f}x", True, BLACK)
         screen.blit(speed_text, (10, 40))
-
-        # Toon agent aantallen
-        student_count = sum(1 for agent in model.schedule if agent.agent_type == 'student')
-        adult_count = sum(1 for agent in model.schedule if agent.agent_type == 'adult')
-
+        student_count = sum(1 for agent in model.schedule if agent.agent_type == "student")
+        adult_count = sum(1 for agent in model.schedule if agent.agent_type == "adult")
         count_text = font.render(f"Students: {student_count}, Adults: {adult_count}", True, BLACK)
         screen.blit(count_text, (10, 70))
-
-        # Display FPS
         fps_text = font.render(f"FPS: {current_fps:.1f}", True, BLACK)
         screen.blit(fps_text, (10, 100))
-
-        # Toon help informatie
-        help_text = font.render("↑/↓: Speed up/down | Space: Reset speed | S: Add students | A: Add adults", True,
-                                BLACK)
+        help_text = font.render("↑/↓: Speed up/down | Space: Reset speed | S: Add students | A: Add adults", True, BLACK)
         screen.blit(help_text, (10, screen_height - 30))
 
         # Scherm updaten
         pygame.display.flip()
 
-        # Framerate beperken tot 60 fps
+        # Framerate beperken
         clock.tick(60)
 
     pygame.quit()
 
-
-# Hoofdprogramma
 if __name__ == "__main__":
     run_pygame_simulation()
