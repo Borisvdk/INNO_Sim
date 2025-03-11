@@ -31,6 +31,17 @@ class SchoolModel:
             adult = AdultAgent(i + self.num_students, self, (x, y), "adult", self.schedule)
             self.schedule.append(adult)
 
+        # Voeg muren toe
+        self.walls = [
+            (20, 20, 580, 22),  # boven
+            (20, 195, 250, 197),  # midden links
+            (340, 195, 580, 197),  # midden rechts
+            (20, 375, 580, 377),  # onder
+            (20, 20, 22, 375),  # links
+            (578, 20, 580, 375),  # rechts
+
+        ]
+
     def step_continuous(self, dt):
         """Voer een continue tijdstap uit met delta tijd dt."""
         # Update de totale simulatietijd

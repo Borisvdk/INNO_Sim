@@ -82,6 +82,20 @@ def run_pygame_simulation():
         # Scherm wissen
         screen.fill(WHITE)
 
+        # Teken de muren
+        for wall in model.walls:
+            x_min, y_min, x_max, y_max = wall
+            pygame.draw.rect(
+                screen,
+                BLACK,
+                pygame.Rect(
+                    x_min * scale_factor,
+                    y_min * scale_factor,
+                    (x_max - x_min) * scale_factor,
+                    (y_max - y_min) * scale_factor
+                )
+            )
+
         # Agenten tekenen
         for agent in model.schedule:
             x, y = agent.position
