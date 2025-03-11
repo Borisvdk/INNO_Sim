@@ -1,3 +1,5 @@
+import math
+
 from schoolmodel import SchoolModel
 import time
 import pygame
@@ -15,6 +17,7 @@ N_ADULTS = 20
 # School dimensions - INCREASED SIZE with proper aspect ratio
 SCHOOL_WIDTH = 600  # Match the aspect ratio of the screen (1.2:1)
 SCHOOL_HEIGHT = 400
+
 
 def run_pygame_simulation():
     """Simulatie met pygame met continue tijd."""
@@ -36,9 +39,13 @@ def run_pygame_simulation():
 
     # Kleuren definiëren
     WHITE = (255, 255, 255)
-    BLUE = (0, 0, 255)
-    RED = (255, 0, 0)
-    BLACK = (0, 0, 0)
+    BLUE = (0, 0, 255)  # Students
+    RED = (255, 0, 0)  # Adults
+    BLACK = (0, 0, 0)  # Walls
+
+    # Highlight colors for agents with weapons (if implemented)
+    ARMED_STUDENT_COLOR = (100, 100, 255)  # Lighter blue
+    ARMED_ADULT_COLOR = (255, 100, 100)  # Lighter red
 
     # Font voor tekst
     font = pygame.font.SysFont(None, 24)
@@ -76,7 +83,6 @@ def run_pygame_simulation():
         simulation_time += sim_dt
 
         # Continue update van het model met delta tijd (in simulatie eenheden)
-        # We delen door SECONDS_PER_STEP omdat elke 'stap' 5 seconden voorstelt
         model.step_continuous(sim_dt)
 
         # Scherm wissen
@@ -104,11 +110,32 @@ def run_pygame_simulation():
             screen_x = int(x * scale_factor)
             screen_y = int(y * scale_factor)
 
-            # Kleur bepalen op basis van agent type
-            color = BLUE if agent.agent_type == 'student' else RED
+            # Determine color based on agent type and armed status
+            if agent.agent_type == 'student':
+                color = ARMED_STUDENT_COLOR if getattr(agent, 'has_weapon', False) else BLUE
+            else:  # adult
+                color = ARMED_ADULT_COLOR if getattr(agent, 'has_weapon', False) else RED
 
-            # Agent tekenen als cirkel
-            pygame.draw.circle(screen, color, (screen_x, screen_y), 4)  # Iets grotere cirkels voor de grotere scherm
+            # Draw agent as circle with proper radius
+            # Use agent's actual radius from the physics model
+            scaled_radius = int(agent.radius * scale_factor)
+            pygame.draw.circle(screen, color, (screen_x, screen_y), scaled_radius)
+
+            # Optional: Draw direction indicator (a small line showing where agent is heading)
+            if hasattr(agent, 'velocity'):
+                vx, vy = agent.velocity
+                speed = math.sqrt(vx * vx + vy * vy)
+                if speed > 0:
+                    # Normalize and scale
+                    direction_x = vx / speed * (scaled_radius + 2)
+                    direction_y = vy / speed * (scaled_radius + 2)
+                    pygame.draw.line(
+                        screen,
+                        (0, 0, 0),
+                        (screen_x, screen_y),
+                        (screen_x + direction_x, screen_y + direction_y),
+                        1
+                    )
 
         # Toon simulatie informatie
         time_text = font.render(f"Sim Time: {simulation_time:.1f}s", True, BLACK)
