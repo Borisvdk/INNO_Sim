@@ -14,6 +14,7 @@ class SchoolModel:
         self.height = height
         self.running = True
         self.schedule = []  # List of all agents
+        self.active_shots = []  # List to store active shots
         self.simulation_time = 0.0  # Total simulated time
 
         # Initialize spatial grid

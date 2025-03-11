@@ -33,20 +33,25 @@ class StudentAgent(SchoolAgent):
             if nearby_agents:
                 # Select a random target
                 target = random.choice(nearby_agents)
-
-                # Play gunshot sound (shot is fired)
-                self.model.gunshot_sound.play()
-
-                # Attempt to hit the target
+                # Record the shot
+                shot = {
+                    'start_pos': self.position,    # Shooter's position
+                    'end_pos': target.position,    # Target's position at firing time
+                    'start_time': current_time     # When the shot was fired
+                }
+                self.model.active_shots.append(shot)
+                # Play gunshot sound (if available)
+                if hasattr(self.model, 'gunshot_sound'):
+                    self.model.gunshot_sound.play()
+                # Determine if the shot hits
                 if random.random() < self.hit_probability:
-                    # Play kill sound (shot hits and kills)
-                    self.model.kill_sound.play()
                     print(f"Shooter {self.unique_id} hit agent {target.unique_id}")
                     self.model.remove_agent(target)
+                    if hasattr(self.model, 'kill_sound'):
+                        self.model.kill_sound.play()
                 else:
                     print(f"Shooter {self.unique_id} missed")
-
-                # Update the last shot time
+                # Update last shot time
                 self.last_shot_time = current_time
 
     def get_nearby_agents(self, radius):

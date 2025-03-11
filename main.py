@@ -64,6 +64,7 @@ def run_pygame_simulation():
     current_time = time.time()
     simulation_time = 0.0  # Totale gesimuleerde tijd in seconden
     sim_speed = 1.0  # Simulatiesnelheid factor (1.0 = realtime)
+    shot_duration = 0.5  # Display each shot for 0.5 seconds in simulation time
 
     # Performance tracking
     frame_times = []
@@ -168,6 +169,22 @@ def run_pygame_simulation():
                         (screen_x + direction_x, screen_y + direction_y),
                         1
                     )
+
+        # Draw active shots
+        current_time = model.simulation_time
+        for shot in model.active_shots[:]:  # Use a copy to allow removal during iteration
+            if current_time - shot['start_time'] < shot_duration:
+                # Extract positions
+                start_x, start_y = shot['start_pos']
+                end_x, end_y = shot['end_pos']
+                # Scale to screen coordinates
+                screen_start = (int(start_x * scale_factor), int(start_y * scale_factor))
+                screen_end = (int(end_x * scale_factor), int(end_y * scale_factor))
+                # Draw a red line
+                pygame.draw.line(screen, (255, 0, 0), screen_start, screen_end, 2)
+            else:
+                # Remove expired shots
+                model.active_shots.remove(shot)
 
         # Performance tracking
         frame_end_time = time.time()
