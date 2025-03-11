@@ -2,6 +2,55 @@ import random
 import math
 
 
+class SpatialGrid:
+    """A grid-based spatial partitioning system for efficiently finding nearby agents."""
+
+    def __init__(self, width, height, cell_size):
+        self.cell_size = cell_size
+        self.grid_width = math.ceil(width / cell_size)
+        self.grid_height = math.ceil(height / cell_size)
+        self.grid = {}  # Dictionary of {(cell_x, cell_y): [agents]}
+
+    def clear(self):
+        """Clear all cells in the grid."""
+        self.grid = {}
+
+    def add_agent(self, agent):
+        """Add an agent to the appropriate grid cell."""
+        cell_x, cell_y = self._get_cell_indices(agent.position)
+        cell_key = (cell_x, cell_y)
+
+        if cell_key not in self.grid:
+            self.grid[cell_key] = []
+
+        self.grid[cell_key].append(agent)
+
+    def _get_cell_indices(self, position):
+        """Convert a position to grid cell indices."""
+        x, y = position
+        cell_x = int(x / self.cell_size)
+        cell_y = int(y / self.cell_size)
+        return cell_x, cell_y
+
+    def get_nearby_agents(self, position, radius):
+        """Get all agents within a certain radius of a position."""
+        center_x, center_y = position
+        # Calculate the cell range that could contain agents within the radius
+        cell_radius = math.ceil(radius / self.cell_size)
+        cell_x, cell_y = self._get_cell_indices(position)
+
+        nearby_agents = []
+
+        # Check all cells in the region
+        for dx in range(-cell_radius, cell_radius + 1):
+            for dy in range(-cell_radius, cell_radius + 1):
+                cell_key = (cell_x + dx, cell_y + dy)
+                if cell_key in self.grid:
+                    nearby_agents.extend(self.grid[cell_key])
+
+        return nearby_agents
+
+
 class SchoolAgent:
     """Basis agent klasse voor alle agenten in de school simulatie."""
 
@@ -12,10 +61,7 @@ class SchoolAgent:
         self.position = position
         self.has_weapon = False
         self.awareness = 0.0
-        self.agents = agents
-
-        # Aangepaste snelheid voor grotere school
-        self.max_speed = 100.0
+        self.agents = agents  # We'll keep this for backward compatibility, but won't use it for proximity
 
         # Agent physical properties
         self.radius = 3.0  # Agent radius in world units
@@ -23,6 +69,9 @@ class SchoolAgent:
         if agent_type == "adult":
             self.radius = 4.0  # Adults slightly larger
             self.mass = 1.3
+
+        # Aangepaste snelheid voor grotere school
+        self.max_speed = 100.0
 
         # Parameters voor menselijkere beweging
         self.velocity = (0.0, 0.0)
@@ -38,20 +87,20 @@ class SchoolAgent:
         self.idle_time = 0
         self.idle_duration = random.uniform(1, 3)
 
-        if agent_type == "adult":  # ADULT
+        if agent_type == "adult":
             self.idle_prob = 0.7
             self.idle_duration = random.uniform(1.5, 4)
             self.path_time = random.uniform(1, 3)
 
-        # **Proximity check timer**
-        self.proximity_timer = 0.0  # Keeps track of time since last check
-        self.proximity_check_interval = 1
-
         # Collision avoidance parameters
-        self.personal_space = self.radius * 1.5  # Agents begin avoiding when closer than this
-        self.min_distance = self.radius  # Minimum distance between agent centers
+        self.personal_space = self.radius * 3  # Agents begin avoiding when closer than this
+        self.min_distance = self.radius * 2  # Minimum distance between agent centers
         self.avoidance_strength = 30.0  # How strongly agents avoid each other
         self.wall_avoidance_strength = 50.0  # How strongly agents avoid walls
+
+        # Optimize by caching square of distances to avoid square root calculations
+        self.personal_space_squared = self.personal_space ** 2
+        self.min_distance_squared = self.min_distance ** 2
 
     def move_continuous(self, dt):
         """Beweeg de agent volgens huidige richting en snelheid met delta tijd."""
@@ -137,32 +186,33 @@ class SchoolAgent:
             # If even reduced movement causes collision, don't move
 
     def calculate_avoidance_forces(self):
-        """Calculate repulsive forces from nearby agents"""
+        """Calculate repulsive forces from nearby agents using spatial grid for efficiency"""
         force_x, force_y = 0, 0
 
-        for agent in self.agents:
+        # Get nearby agents from spatial grid instead of checking all agents
+        nearby_agents = self.model.spatial_grid.get_nearby_agents(self.position, self.personal_space)
+
+        for agent in nearby_agents:
             if agent != self:
-                dist = self.distance_to(agent)
+                # Calculate squared distance (faster than actual distance)
+                dx = self.position[0] - agent.position[0]
+                dy = self.position[1] - agent.position[1]
+                dist_squared = dx * dx + dy * dy
 
                 # Only apply force if within personal space but not overlapping
-                if dist < self.personal_space and dist > 0:
-                    # Calculate direction vector from other agent to this agent
-                    dx = self.position[0] - agent.position[0]
-                    dy = self.position[1] - agent.position[1]
-
-                    # Normalize direction vector
-                    magnitude = math.sqrt(dx * dx + dy * dy)
-                    if magnitude > 0:
-                        dx /= magnitude
-                        dy /= magnitude
-
+                if dist_squared < self.personal_space_squared and dist_squared > 0:
                     # Force is stronger as agents get closer
-                    # Inverse square law: force ∝ 1/distance²
-                    force_strength = self.avoidance_strength / (dist * dist)
+                    # We can use squared distance to avoid square root
+                    force_strength = self.avoidance_strength / dist_squared
+
+                    # Normalize direction vector without square root
+                    inv_dist = 1.0 / math.sqrt(dist_squared)  # Only one sqrt operation
+                    norm_dx = dx * inv_dist
+                    norm_dy = dy * inv_dist
 
                     # Add to total force
-                    force_x += dx * force_strength
-                    force_y += dy * force_strength
+                    force_x += norm_dx * force_strength
+                    force_y += norm_dy * force_strength
 
         return force_x, force_y
 
@@ -171,68 +221,76 @@ class SchoolAgent:
         force_x, force_y = 0, 0
         margin = self.radius * 3  # How close to wall before avoidance kicks in
 
-        # Avoid walls
-        for wall in self.model.walls:
+        # Cache position for multiple accesses
+        pos_x, pos_y = self.position
+
+        # Avoid walls - only check nearby walls instead of all walls
+        x_min_grid = int(max(0, (pos_x - margin) / self.model.width * 10))
+        x_max_grid = int(min(9, (pos_x + margin) / self.model.width * 10))
+        y_min_grid = int(max(0, (pos_y - margin) / self.model.height * 10))
+        y_max_grid = int(min(9, (pos_y + margin) / self.model.height * 10))
+
+        # Get wall indices that could be nearby
+        potential_wall_indices = set()
+        for x_grid in range(x_min_grid, x_max_grid + 1):
+            for y_grid in range(y_min_grid, y_max_grid + 1):
+                grid_key = (x_grid, y_grid)
+                if grid_key in self.model.wall_grid:
+                    potential_wall_indices.update(self.model.wall_grid[grid_key])
+
+        # Now only check those walls
+        for wall_idx in potential_wall_indices:
+            wall = self.model.walls[wall_idx]
             x_min, y_min, x_max, y_max = wall
 
-            # Check if agent is near this wall
-            near_x_min = abs(self.position[0] - x_min) < margin
-            near_x_max = abs(self.position[0] - x_max) < margin
-            near_y_min = abs(self.position[1] - y_min) < margin
-            near_y_max = abs(self.position[1] - y_max) < margin
+            # Calculate distances to each wall segment
+            dist_x_min = pos_x - x_min
+            dist_x_max = x_max - pos_x
+            dist_y_min = pos_y - y_min
+            dist_y_max = y_max - pos_y
 
-            # Calculate distances to each wall
-            dist_x_min = self.position[0] - x_min
-            dist_x_max = x_max - self.position[0]
-            dist_y_min = self.position[1] - y_min
-            dist_y_max = y_max - self.position[1]
-
-            # Apply forces based on proximity to walls
-            if near_x_min and self.position[1] >= y_min and self.position[1] <= y_max:
+            # Apply forces based on proximity to walls - only if close enough
+            if dist_x_min < margin and pos_y >= y_min and pos_y <= y_max:
                 force_x += self.wall_avoidance_strength / (dist_x_min + 0.1)
 
-            if near_x_max and self.position[1] >= y_min and self.position[1] <= y_max:
+            if dist_x_max < margin and pos_y >= y_min and pos_y <= y_max:
                 force_x -= self.wall_avoidance_strength / (dist_x_max + 0.1)
 
-            if near_y_min and self.position[0] >= x_min and self.position[0] <= x_max:
+            if dist_y_min < margin and pos_x >= x_min and pos_x <= x_max:
                 force_y += self.wall_avoidance_strength / (dist_y_min + 0.1)
 
-            if near_y_max and self.position[0] >= x_min and self.position[0] <= x_max:
+            if dist_y_max < margin and pos_x >= x_min and pos_x <= x_max:
                 force_y -= self.wall_avoidance_strength / (dist_y_max + 0.1)
 
         return force_x, force_y
 
     def would_collide(self, proposed_position):
         """Check if moving to proposed_position would cause collision with any agent"""
-        for agent in self.agents:
+        # Use spatial grid to only check nearby agents
+        nearby_agents = self.model.spatial_grid.get_nearby_agents(proposed_position, self.min_distance)
+
+        min_dist_squared = self.min_distance_squared  # Cache for speed
+        prop_x, prop_y = proposed_position
+
+        for agent in nearby_agents:
             if agent != self:
-                dist = math.sqrt((proposed_position[0] - agent.position[0]) ** 2 +
-                                 (proposed_position[1] - agent.position[1]) ** 2)
-                if dist < (self.radius + agent.radius):
+                # Calculate squared distance (faster than actual distance)
+                agent_x, agent_y = agent.position
+                dx = prop_x - agent_x
+                dy = prop_y - agent_y
+                dist_squared = dx * dx + dy * dy
+
+                # Compare squares to avoid square root
+                if dist_squared < min_dist_squared:
                     return True
         return False
 
-    def distance_to(self, other_agent):
-        """Calculate distance to another agent"""
-        return math.sqrt((self.position[0] - other_agent.position[0]) ** 2 +
-                         (self.position[1] - other_agent.position[1]) ** 2)
-
-    def check_proximity(self, radius):
-        """Check which agents are within a given radius of each other"""
-        for agent in self.agents:
-            for other in self.agents:
-                if agent != other:
-                    dist = agent.distance_to(other)
-                    if dist <= radius:
-                        pass
-                        # print(f"{agent.unique_id} is within {radius} of {other.unique_id} (dist={dist:.2f})")
+    def distance_to_squared(self, other_agent):
+        """Calculate squared distance to another agent (faster than actual distance)"""
+        dx = self.position[0] - other_agent.position[0]
+        dy = self.position[1] - other_agent.position[1]
+        return dx * dx + dy * dy
 
     def step_continuous(self, dt):
         """Voer de acties uit voor een continue tijdstap met delta tijd dt."""
         self.move_continuous(dt)
-
-        # **Only check proximity if enough time has passed**
-        self.proximity_timer += dt
-        if self.proximity_timer >= self.proximity_check_interval:
-            self.check_proximity(5)
-            self.proximity_timer = 0  # Reset timer

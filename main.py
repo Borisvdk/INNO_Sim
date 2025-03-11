@@ -1,21 +1,19 @@
-import math
-
 from schoolmodel import SchoolModel
 import time
 import pygame
+import math
+import random
 
 # Agent types
 STUDENT = 0
 ADULT = 1
 
 # Simulation Parameters
-N_STUDENTS = 526
-N_ADULTS = 33
-N_STUDENTS = 50
+N_STUDENTS = 100
 N_ADULTS = 20
 
-# School dimensions - INCREASED SIZE with proper aspect ratio
-SCHOOL_WIDTH = 600  # Match the aspect ratio of the screen (1.2:1)
+# School dimensions
+SCHOOL_WIDTH = 600
 SCHOOL_HEIGHT = 400
 
 
@@ -57,8 +55,21 @@ def run_pygame_simulation():
     simulation_time = 0.0  # Totale gesimuleerde tijd in seconden
     sim_speed = 1.0  # Simulatiesnelheid factor (1.0 = realtime)
 
+    # Performance tracking
+    frame_times = []
+    last_fps_update = time.time()
+    fps_update_interval = 1.0  # Update FPS display every second
+    current_fps = 0.0  # Initialize FPS counter
+
+    # Import needed classes here to avoid circular imports
+    from agents.studentagent import StudentAgent
+    from agents.adultagent import AdultAgent
+
     running = True
     while running:
+        # Measure frame start time for performance tracking
+        frame_start_time = time.time()
+
         # Events afhandelen
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -72,6 +83,20 @@ def run_pygame_simulation():
                 elif event.key == pygame.K_SPACE:
                     # Reset naar normale snelheid
                     sim_speed = 1.0
+                # Add student with 's' key
+                elif event.key == pygame.K_s:
+                    for _ in range(10):  # Add 10 students at once
+                        x = random.uniform(5, model.width - 5)
+                        y = random.uniform(5, model.height - 5)
+                        student = StudentAgent(len(model.schedule), model, (x, y), "student", model.schedule)
+                        model.schedule.append(student)
+                # Add adult with 'a' key
+                elif event.key == pygame.K_a:
+                    for _ in range(5):  # Add 5 adults at once
+                        x = random.uniform(5, model.width - 5)
+                        y = random.uniform(5, model.height - 5)
+                        adult = AdultAgent(len(model.schedule), model, (x, y), "adult", model.schedule)
+                        model.schedule.append(adult)
 
         # Tijd berekenen
         current_time = time.time()
@@ -121,7 +146,7 @@ def run_pygame_simulation():
             scaled_radius = int(agent.radius * scale_factor)
             pygame.draw.circle(screen, color, (screen_x, screen_y), scaled_radius)
 
-            # Optional: Draw direction indicator (a small line showing where agent is heading)
+            # Draw direction indicator (a small line showing where agent is heading)
             if hasattr(agent, 'velocity'):
                 vx, vy = agent.velocity
                 speed = math.sqrt(vx * vx + vy * vy)
@@ -136,6 +161,19 @@ def run_pygame_simulation():
                         (screen_x + direction_x, screen_y + direction_y),
                         1
                     )
+
+        # Performance tracking
+        frame_end_time = time.time()
+        frame_time = frame_end_time - frame_start_time
+        frame_times.append(frame_time)
+
+        # Calculate FPS over the last second
+        if current_time - last_fps_update > fps_update_interval:
+            if frame_times:
+                avg_frame_time = sum(frame_times) / len(frame_times)
+                current_fps = 1.0 / avg_frame_time if avg_frame_time > 0 else 0
+                frame_times = []  # Reset for next interval
+                last_fps_update = current_time
 
         # Toon simulatie informatie
         time_text = font.render(f"Sim Time: {simulation_time:.1f}s", True, BLACK)
@@ -152,8 +190,13 @@ def run_pygame_simulation():
         count_text = font.render(f"Students: {student_count}, Adults: {adult_count}", True, BLACK)
         screen.blit(count_text, (10, 70))
 
+        # Display FPS
+        fps_text = font.render(f"FPS: {current_fps:.1f}", True, BLACK)
+        screen.blit(fps_text, (10, 100))
+
         # Toon help informatie
-        help_text = font.render("↑/↓: Speed up/down | Space: Reset speed", True, BLACK)
+        help_text = font.render("↑/↓: Speed up/down | Space: Reset speed | S: Add students | A: Add adults", True,
+                                BLACK)
         screen.blit(help_text, (10, screen_height - 30))
 
         # Scherm updaten

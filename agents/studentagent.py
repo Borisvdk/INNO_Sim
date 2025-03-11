@@ -9,6 +9,3 @@ class StudentAgent(SchoolAgent):
         self.fear_level = 0.0
         self.grab_weapon_prob = 0.05  # 5% kans om een wapen te pakken
         self.state = "Normal"  # "Normal", "Fleeing", "Hiding", "Attacking"
-
-    def move(self, ):
-        pass
