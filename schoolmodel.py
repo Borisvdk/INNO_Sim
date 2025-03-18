@@ -10,14 +10,14 @@ class AgentFactory:
         """Create and return an agent of the specified type."""
         if agent_type == "student":
             from agents.studentagent import StudentAgent
-            agent = StudentAgent(unique_id, model, position, agent_type, model.schedule)
+            agent = StudentAgent(unique_id, model, position, agent_type)
             if is_shooter:
                 agent.is_shooter = True
                 agent.has_weapon = True
             return agent
         elif agent_type == "adult":
             from agents.adultagent import AdultAgent
-            return AdultAgent(unique_id, model, position, agent_type, model.schedule)
+            return AdultAgent(unique_id, model, position, agent_type)
         else:
             raise ValueError(f"Unknown agent type: {agent_type}")
 
@@ -101,6 +101,8 @@ class SpatialGrid:
 
 
 class SchoolModel:
+    """Main model class for the school simulation."""
+
     def __init__(self, n_students=50, n_adults=10, width=100, height=100):
         self.num_students = n_students
         self.num_adults = n_adults
@@ -208,9 +210,20 @@ class SchoolModel:
         for agent in self.schedule:
             agent.step_continuous(dt)
 
-        # Ensure all agents are properly in the grid
-        # This is more efficient than clearing and rebuilding from scratch
-        for agent in self.schedule:
+    def add_students(self, count):
+        """Add a specified number of students to the simulation."""
+        for _ in range(count):
+            position = self.generate_safe_position(min_wall_distance=5.0)
+            agent = AgentFactory.create_agent("student", len(self.schedule), self, position)
+            self.schedule.append(agent)
+            self.spatial_grid.update_agent(agent)
+
+    def add_adults(self, count):
+        """Add a specified number of adults to the simulation."""
+        for _ in range(count):
+            position = self.generate_safe_position(min_wall_distance=5.0)
+            agent = AgentFactory.create_agent("adult", len(self.schedule), self, position)
+            self.schedule.append(agent)
             self.spatial_grid.update_agent(agent)
 
     def generate_safe_position(self, min_wall_distance=5.0, max_attempts=100):

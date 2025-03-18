@@ -1,13 +1,15 @@
-from agents.schoolagent import SchoolAgent
-
 import math
 import random
+from agents.schoolagent import SchoolAgent
+from utilities import has_line_of_sight
 
 
 class StudentAgent(SchoolAgent):
-    def __init__(self, unique_id, model, position, agent_type, agents):
-        # Fix the parameter order to match SchoolAgent
-        super().__init__(unique_id, model, agent_type, position, agents)
+    """Agent class for students with potential shooter behaviors."""
+
+    def __init__(self, unique_id, model, position, agent_type):
+        # Initialize parent class
+        super().__init__(unique_id, model, agent_type, position)
 
         # Student-specific attributes
         self.fear_level = 0.0
@@ -21,8 +23,12 @@ class StudentAgent(SchoolAgent):
         self.shooting_range = 10.0  # Stop and shoot within 10 units
         self.hit_probability = 0.5  # 50% chance to hit
 
+        # Search behavior tracking
+        self.search_start_time = 0
+        self.search_direction_change_time = 0
+
     def step_continuous(self, dt):
-        """Optimized version of step_continuous with shooter behavior and wall awareness"""
+        """Override step_continuous with shooter behavior and wall awareness"""
         if not self.is_shooter:
             # Use standard movement for non-shooters
             super().step_continuous(dt)
@@ -151,34 +157,6 @@ class StudentAgent(SchoolAgent):
         # Update last shot time
         self.last_shot_time = current_time
 
-    # Keep the rest of the methods unchanged
-    def would_collide_with_wall(self, position):
-        """Check if a position would collide with any wall"""
-        x, y = position
-        agent_radius = self.radius
-
-        for wall in self.model.walls:
-            wall_x1, wall_y1, wall_x2, wall_y2 = wall
-
-            # Calculate distance to wall - treat walls as rectangles
-            closest_x = max(wall_x1, min(x, wall_x2))
-            closest_y = max(wall_y1, min(y, wall_y2))
-
-            # If closest point is inside the wall, collision is certain
-            if closest_x == x and closest_y == y and wall_x1 <= x <= wall_x2 and wall_y1 <= y <= wall_y2:
-                return True
-
-            # Calculate distance from agent center to closest point on wall
-            dx = x - closest_x
-            dy = y - closest_y
-            distance_squared = dx * dx + dy * dy
-
-            # Collision if distance is less than agent radius
-            if distance_squared <= agent_radius * agent_radius:
-                return True
-
-        return False
-
     def search_behavior(self, dt):
         """Behavior for searching for targets when none are visible"""
         # Check if we've been in search mode for too long without finding a target
@@ -206,82 +184,3 @@ class StudentAgent(SchoolAgent):
             self.search_start_time = self.model.simulation_time
             # More dramatic direction change after long search
             self.direction = random.uniform(0, 2 * math.pi)
-
-    def has_line_of_sight(self, target_position):
-        """
-        Check if this agent has line of sight to the target position.
-        Returns True if there's a clear line of sight, False if a wall blocks the view.
-        """
-        # Get positions
-        start_x, start_y = self.position
-        end_x, end_y = target_position
-
-        # Check each wall for intersection
-        for wall in self.model.walls:
-            if line_intersects_rectangle(
-                    start_x, start_y, end_x, end_y,
-                    wall[0], wall[1], wall[2], wall[3]
-            ):
-                return False  # Wall blocks line of sight
-
-        # No walls block the view
-        return True
-
-
-# These functions can stay outside the class
-def line_intersects_rectangle(line_x1, line_y1, line_x2, line_y2,
-                              rect_x1, rect_y1, rect_x2, rect_y2):
-    """
-    Check if a line intersects with a rectangle.
-    """
-    # Check if either endpoint is inside the rectangle
-    if point_in_rectangle(line_x1, line_y1, rect_x1, rect_y1, rect_x2, rect_y2) or \
-            point_in_rectangle(line_x2, line_y2, rect_x1, rect_y1, rect_x2, rect_y2):
-        return True
-
-    # Check if line intersects with any of the four edges of the rectangle
-    rect_edges = [
-        (rect_x1, rect_y1, rect_x2, rect_y1),  # Top edge
-        (rect_x1, rect_y2, rect_x2, rect_y2),  # Bottom edge
-        (rect_x1, rect_y1, rect_x1, rect_y2),  # Left edge
-        (rect_x2, rect_y1, rect_x2, rect_y2)  # Right edge
-    ]
-
-    for edge_x1, edge_y1, edge_x2, edge_y2 in rect_edges:
-        if line_segments_intersect(
-                line_x1, line_y1, line_x2, line_y2,
-                edge_x1, edge_y1, edge_x2, edge_y2
-        ):
-            return True
-
-    return False
-
-
-def point_in_rectangle(x, y, rect_x1, rect_y1, rect_x2, rect_y2):
-    """Check if a point is inside a rectangle."""
-    return (rect_x1 <= x <= rect_x2 and rect_y1 <= y <= rect_y2)
-
-
-def line_segments_intersect(x1, y1, x2, y2, x3, y3, x4, y4):
-    """
-    Check if two line segments intersect.
-    """
-    # Calculate directions
-    d1x = x2 - x1
-    d1y = y2 - y1
-    d2x = x4 - x3
-    d2y = y4 - y3
-
-    # Calculate the determinant
-    determinant = d1x * d2y - d1y * d2x
-
-    # If determinant is very close to zero, lines are parallel
-    if abs(determinant) < 1e-8:
-        return False
-
-    # Calculate parameters for the intersection point
-    s = ((x1 - x3) * d2y - (y1 - y3) * d2x) / determinant
-    t = ((x1 - x3) * d1y - (y1 - y3) * d1x) / determinant
-
-    # Check if the intersection is within both line segments
-    return 0 <= s <= 1 and 0 <= t <= 1
