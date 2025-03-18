@@ -16,6 +16,7 @@ N_ADULTS = 20
 SCHOOL_WIDTH = 600
 SCHOOL_HEIGHT = 400
 
+
 def run_pygame_simulation():
     """Simulatie met pygame met continue tijd, inclusief een shooter."""
     import pygame
@@ -48,12 +49,12 @@ def run_pygame_simulation():
 
     # Kleuren definiëren
     WHITE = (255, 255, 255)
-    BLUE = (0, 0, 255)    # Normale studenten
-    RED = (255, 0, 0)     # Volwassenen
-    BLACK = (0, 0, 0)     # Muren
-    GREEN = (0, 255, 0)   # Shooter (onderscheiden van andere agenten)
+    BLUE = (0, 0, 255)  # Normale studenten
+    RED = (255, 0, 0)  # Volwassenen
+    BLACK = (0, 0, 0)  # Muren
+    GREEN = (0, 255, 0)  # Shooter (onderscheiden van andere agenten)
     ARMED_STUDENT_COLOR = (100, 100, 255)  # Lichter blauw voor gewapende studenten (niet-shooter)
-    ARMED_ADULT_COLOR = (255, 100, 100)    # Lichter rood voor gewapende volwassenen
+    ARMED_ADULT_COLOR = (255, 100, 100)  # Lichter rood voor gewapende volwassenen
 
     # Font voor tekst
     font = pygame.font.SysFont(None, 24)
@@ -67,10 +68,9 @@ def run_pygame_simulation():
     shot_duration = 0.5  # Display each shot for 0.5 seconds in simulation time
 
     # Performance tracking
-    frame_times = []
-    last_fps_update = time.time()
-    fps_update_interval = 1.0  # Update FPS display elke seconde
-    current_fps = 0.0  # Initialiseer FPS teller
+    fps_samples = []
+    fps_update_time = time.time()
+    current_fps = 0
 
     # Importeer klassen om circulaire imports te vermijden
     from agents.studentagent import StudentAgent
@@ -186,18 +186,18 @@ def run_pygame_simulation():
                 # Remove expired shots
                 model.active_shots.remove(shot)
 
-        # Performance tracking
-        frame_end_time = time.time()
-        frame_time = frame_end_time - frame_start_time
-        frame_times.append(frame_time)
+        current_frame_time = time.time() - frame_start_time
+        fps_samples.append(1.0 / current_frame_time if current_frame_time > 0 else 0)
 
-        # Bereken FPS over de laatste seconde
-        if current_time - last_fps_update > fps_update_interval:
-            if frame_times:
-                avg_frame_time = sum(frame_times) / len(frame_times)
-                current_fps = 1.0 / avg_frame_time if avg_frame_time > 0 else 0
-                frame_times = []
-                last_fps_update = current_time
+        # Keep only recent samples (last ~0.5 seconds)
+        if len(fps_samples) > 30:
+            fps_samples.pop(0)
+
+        # Update FPS every 0.25 seconds
+        if time.time() - fps_update_time >= 0.25:
+            if fps_samples:
+                current_fps = sum(fps_samples) / len(fps_samples)
+            fps_update_time = time.time()
 
         # Toon simulatie-informatie
         time_text = font.render(f"Sim Time: {simulation_time:.1f}s", True, BLACK)
@@ -210,7 +210,8 @@ def run_pygame_simulation():
         screen.blit(count_text, (10, 70))
         fps_text = font.render(f"FPS: {current_fps:.1f}", True, BLACK)
         screen.blit(fps_text, (10, 100))
-        help_text = font.render("↑/↓: Speed up/down | Space: Reset speed | S: Add students | A: Add adults", True, BLACK)
+        help_text = font.render("↑/↓: Speed up/down | Space: Reset speed | S: Add students | A: Add adults", True,
+                                BLACK)
         screen.blit(help_text, (10, screen_height - 30))
 
         # Scherm updaten
@@ -220,6 +221,7 @@ def run_pygame_simulation():
         clock.tick(60)
 
     pygame.quit()
+
 
 if __name__ == "__main__":
     run_pygame_simulation()
