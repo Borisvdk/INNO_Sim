@@ -18,206 +18,232 @@ SCHOOL_HEIGHT = 400
 
 
 def run_pygame_simulation():
-    """Simulatie met pygame met continue tijd, inclusief een shooter."""
-    import pygame
+    """Optimized pygame simulation with continuous time."""
+    # Import agent classes (to avoid circular imports)
+    from agents.studentagent import StudentAgent
+    from agents.adultagent import AdultAgent
 
-    # Maak een nieuw model met grotere afmetingen en een shooter
+    # Initialize model
     model = SchoolModel(n_students=N_STUDENTS, n_adults=N_ADULTS, width=SCHOOL_WIDTH, height=SCHOOL_HEIGHT)
 
-    # Pygame initialiseren
+    # Pygame initialization
     pygame.init()
 
-    # Load sound files
-    gunshot_sound = pygame.mixer.Sound("gunshot.wav")
-    kill_sound = pygame.mixer.Sound("kill.wav")
+    # Load sound files - with error handling
+    try:
+        gunshot_sound = pygame.mixer.Sound("gunshot.wav")
+        kill_sound = pygame.mixer.Sound("kill.wav")
+        gunshot_sound.set_volume(0.5)
+        kill_sound.set_volume(0.5)
+        model.gunshot_sound = gunshot_sound
+        model.kill_sound = kill_sound
+    except pygame.error:
+        print("Warning: Sound files not found. Continuing without sound.")
+        # Create empty attributes to avoid attribute errors
+        model.gunshot_sound = None
+        model.kill_sound = None
 
-    # Optional: Adjust volume (0.0 = silent, 1.0 = full volume)
-    gunshot_sound.set_volume(0.5)  # 50% volume
-    kill_sound.set_volume(0.5)  # 50% volume
-
-    # Attach sounds to the model for agent access
-    model.gunshot_sound = gunshot_sound
-    model.kill_sound = kill_sound
-
-    # Schermgrootte en schaling instellen
+    # Screen setup
     screen_width, screen_height = 1200, 800
     scale_factor = min(screen_width / model.width, screen_height / model.height)
-
-    # Pygame scherm maken
     screen = pygame.display.set_mode((screen_width, screen_height))
     pygame.display.set_caption("School Shooter Simulation")
 
-    # Kleuren definiëren
-    WHITE = (255, 255, 255)
-    BLUE = (0, 0, 255)  # Normale studenten
-    RED = (255, 0, 0)  # Volwassenen
-    BLACK = (0, 0, 0)  # Muren
-    GREEN = (0, 255, 0)  # Shooter (onderscheiden van andere agenten)
-    ARMED_STUDENT_COLOR = (100, 100, 255)  # Lichter blauw voor gewapende studenten (niet-shooter)
-    ARMED_ADULT_COLOR = (255, 100, 100)  # Lichter rood voor gewapende volwassenen
+    # Pre-define colors for reuse
+    COLORS = {
+        "WHITE": (255, 255, 255),
+        "BLUE": (0, 0, 255),
+        "RED": (255, 0, 0),
+        "BLACK": (0, 0, 0),
+        "GREEN": (0, 255, 0),
+        "ARMED_STUDENT": (100, 100, 255),
+        "ARMED_ADULT": (255, 100, 100)
+    }
 
-    # Font voor tekst
+    # Create a cached background with walls
+    background = pygame.Surface((screen_width, screen_height))
+    background.fill(COLORS["WHITE"])
+
+    # Draw walls on background
+    for wall in model.walls:
+        x_min, y_min, x_max, y_max = wall
+        pygame.draw.rect(
+            background,
+            COLORS["BLACK"],
+            pygame.Rect(
+                x_min * scale_factor,
+                y_min * scale_factor,
+                (x_max - x_min) * scale_factor,
+                (y_max - y_min) * scale_factor
+            )
+        )
+
+    # Create font and pre-render static UI text
     font = pygame.font.SysFont(None, 24)
+    help_text = font.render(
+        "↑/↓: Speed up/down | Space: Reset speed | S: Add students | A: Add adults",
+        True, COLORS["BLACK"]
+    )
 
-    # Tijdvariabelen voor continue simulatie
+    # Time tracking variables
     clock = pygame.time.Clock()
     last_update_time = time.time()
-    current_time = time.time()
-    simulation_time = 0.0  # Totale gesimuleerde tijd in seconden
-    sim_speed = 1.0  # Simulatiesnelheid factor (1.0 = realtime)
-    shot_duration = 0.5  # Display each shot for 0.5 seconds in simulation time
+    simulation_time = 0.0
+    sim_speed = 1.0
+    shot_duration = 0.5
 
-    # Performance tracking
+    # FPS tracking with improved accuracy
     fps_samples = []
     fps_update_time = time.time()
     current_fps = 0
 
-    # Importeer klassen om circulaire imports te vermijden
-    from agents.studentagent import StudentAgent
-    from agents.adultagent import AdultAgent
-
+    # Main simulation loop
     running = True
     while running:
-        # Meet frametijd voor performance tracking
         frame_start_time = time.time()
 
-        # Events afhandelen
+        # Event handling
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_UP:
-                    sim_speed *= 2.0  # Verdubbel snelheid
+                    sim_speed *= 2.0  # Double speed
                 elif event.key == pygame.K_DOWN:
-                    sim_speed /= 2.0  # Halveer snelheid
+                    sim_speed /= 2.0  # Halve speed
                 elif event.key == pygame.K_SPACE:
-                    sim_speed = 1.0  # Reset naar normale snelheid
+                    sim_speed = 1.0  # Reset to normal speed
                 elif event.key == pygame.K_s:
-                    for _ in range(10):  # Voeg 10 studenten toe
+                    # Add 10 students efficiently
+                    for _ in range(10):
                         x = random.uniform(5, model.width - 5)
                         y = random.uniform(5, model.height - 5)
                         student = StudentAgent(len(model.schedule), model, (x, y), "student", model.schedule)
                         model.schedule.append(student)
+                        model.spatial_grid.update_agent(student)
                 elif event.key == pygame.K_a:
-                    for _ in range(5):  # Voeg 5 volwassenen toe
+                    # Add 5 adults efficiently
+                    for _ in range(5):
                         x = random.uniform(5, model.width - 5)
                         y = random.uniform(5, model.height - 5)
                         adult = AdultAgent(len(model.schedule), model, (x, y), "adult", model.schedule)
                         model.schedule.append(adult)
+                        model.spatial_grid.update_agent(adult)
 
-        # Tijd berekenen
+        # Time calculations
         current_time = time.time()
         dt = current_time - last_update_time
         last_update_time = current_time
-
-        # Gesimuleerde tijd bijwerken met snelheidsfactor
         sim_dt = dt * sim_speed
         simulation_time += sim_dt
 
-        # Continue update van het model
+        # Update model - single step
         model.step_continuous(sim_dt)
 
-        # Scherm wissen
-        screen.fill(WHITE)
+        # Draw background (with walls)
+        screen.blit(background, (0, 0))
 
-        # Teken de muren
-        for wall in model.walls:
-            x_min, y_min, x_max, y_max = wall
-            pygame.draw.rect(
-                screen,
-                BLACK,
-                pygame.Rect(
-                    x_min * scale_factor,
-                    y_min * scale_factor,
-                    (x_max - x_min) * scale_factor,
-                    (y_max - y_min) * scale_factor
-                )
-            )
+        # Pre-calculate draw lists for batch rendering
+        circles_to_draw = []
+        lines_to_draw = []
 
-        # Agenten tekenen
         for agent in model.schedule:
             x, y = agent.position
             screen_x = int(x * scale_factor)
             screen_y = int(y * scale_factor)
             scaled_radius = int(agent.radius * scale_factor)
 
-            # Bepaal kleur gebaseerd op agenttype en status
+            # Determine color
             if agent.agent_type == "student":
                 if getattr(agent, "is_shooter", False):
-                    color = GREEN  # Shooter in groen
+                    color = COLORS["GREEN"]
                 elif getattr(agent, "has_weapon", False):
-                    color = ARMED_STUDENT_COLOR
+                    color = COLORS["ARMED_STUDENT"]
                 else:
-                    color = BLUE
+                    color = COLORS["BLUE"]
             else:  # adult
-                color = ARMED_ADULT_COLOR if getattr(agent, "has_weapon", False) else RED
+                color = COLORS["ARMED_ADULT"] if getattr(agent, "has_weapon", False) else COLORS["RED"]
 
-            # Teken agent als cirkel
-            pygame.draw.circle(screen, color, (screen_x, screen_y), scaled_radius)
+            # Add circle to draw list
+            circles_to_draw.append((color, (screen_x, screen_y), scaled_radius))
 
-            # Teken richtingaanwijzer
+            # Add direction line to draw list if moving
             if hasattr(agent, "velocity"):
                 vx, vy = agent.velocity
-                speed = math.sqrt(vx * vx + vy * vy)
-                if speed > 0:
+                speed_squared = vx * vx + vy * vy
+                if speed_squared > 0.01:  # Only draw if moving at significant speed
+                    speed = math.sqrt(speed_squared)
                     direction_x = vx / speed * (scaled_radius + 2)
                     direction_y = vy / speed * (scaled_radius + 2)
-                    pygame.draw.line(
-                        screen,
-                        BLACK,
-                        (screen_x, screen_y),
-                        (screen_x + direction_x, screen_y + direction_y),
-                        1
+                    lines_to_draw.append(
+                        (COLORS["BLACK"], (screen_x, screen_y),
+                         (screen_x + direction_x, screen_y + direction_y), 1)
                     )
 
-        # Draw active shots
-        current_time = model.simulation_time
-        for shot in model.active_shots[:]:  # Use a copy to allow removal during iteration
-            if current_time - shot['start_time'] < shot_duration:
-                # Extract positions
+        # Draw all circles in batch
+        for color, pos, radius in circles_to_draw:
+            pygame.draw.circle(screen, color, pos, radius)
+
+        # Draw all lines in batch
+        for color, start, end, width in lines_to_draw:
+            pygame.draw.line(screen, color, start, end, width)
+
+        # Process and draw active shots efficiently
+        current_sim_time = model.simulation_time
+        shots_to_remove = []
+
+        for i, shot in enumerate(model.active_shots):
+            if current_sim_time - shot['start_time'] < shot_duration:
+                # Scale shot coordinates
                 start_x, start_y = shot['start_pos']
                 end_x, end_y = shot['end_pos']
-                # Scale to screen coordinates
                 screen_start = (int(start_x * scale_factor), int(start_y * scale_factor))
                 screen_end = (int(end_x * scale_factor), int(end_y * scale_factor))
-                # Draw a red line
                 pygame.draw.line(screen, (255, 0, 0), screen_start, screen_end, 2)
             else:
-                # Remove expired shots
-                model.active_shots.remove(shot)
+                shots_to_remove.append(i)
 
+        # Remove expired shots - start from highest index to avoid shifting issues
+        for i in sorted(shots_to_remove, reverse=True):
+            if i < len(model.active_shots):
+                model.active_shots.pop(i)
+
+        # FPS calculation - improved moving average method
         current_frame_time = time.time() - frame_start_time
-        fps_samples.append(1.0 / current_frame_time if current_frame_time > 0 else 0)
+        if current_frame_time > 0:
+            fps_samples.append(1.0 / current_frame_time)
 
-        # Keep only recent samples (last ~0.5 seconds)
-        if len(fps_samples) > 30:
-            fps_samples.pop(0)
+            # Keep only recent samples (last ~0.5 seconds)
+            if len(fps_samples) > 30:
+                fps_samples.pop(0)
 
-        # Update FPS every 0.25 seconds
-        if time.time() - fps_update_time >= 0.25:
-            if fps_samples:
-                current_fps = sum(fps_samples) / len(fps_samples)
-            fps_update_time = time.time()
+            # Update FPS every 0.25 seconds
+            if time.time() - fps_update_time >= 0.25:
+                if fps_samples:
+                    current_fps = sum(fps_samples) / len(fps_samples)
+                fps_update_time = time.time()
 
-        # Toon simulatie-informatie
-        time_text = font.render(f"Sim Time: {simulation_time:.1f}s", True, BLACK)
-        screen.blit(time_text, (10, 10))
-        speed_text = font.render(f"Speed: {sim_speed:.1f}x", True, BLACK)
-        screen.blit(speed_text, (10, 40))
+        # Count agents once for display
         student_count = sum(1 for agent in model.schedule if agent.agent_type == "student")
         adult_count = sum(1 for agent in model.schedule if agent.agent_type == "adult")
-        count_text = font.render(f"Students: {student_count}, Adults: {adult_count}", True, BLACK)
+
+        # Render dynamic UI text
+        time_text = font.render(f"Sim Time: {simulation_time:.1f}s", True, COLORS["BLACK"])
+        speed_text = font.render(f"Speed: {sim_speed:.1f}x", True, COLORS["BLACK"])
+        count_text = font.render(f"Students: {student_count}, Adults: {adult_count}", True, COLORS["BLACK"])
+        fps_text = font.render(f"FPS: {current_fps:.1f}", True, COLORS["BLACK"])
+
+        # Draw UI text
+        screen.blit(time_text, (10, 10))
+        screen.blit(speed_text, (10, 40))
         screen.blit(count_text, (10, 70))
-        fps_text = font.render(f"FPS: {current_fps:.1f}", True, BLACK)
         screen.blit(fps_text, (10, 100))
-        help_text = font.render("↑/↓: Speed up/down | Space: Reset speed | S: Add students | A: Add adults", True,
-                                BLACK)
         screen.blit(help_text, (10, screen_height - 30))
 
-        # Scherm updaten
+        # Update display once per frame
         pygame.display.flip()
 
-        # Framerate beperken
+        # Frame rate limiting
         clock.tick(60)
 
     pygame.quit()
