@@ -1,12 +1,14 @@
 from agents.schoolagent import SchoolAgent
+import random
 
 
 class AdultAgent(SchoolAgent):
-    """Simplified adult agent class that mostly inherits from SchoolAgent."""
+    """Agent class for adults (teachers, staff) with basic behaviors."""
 
     def __init__(self, unique_id, model, position, agent_type, agents):
-        # SchoolAgent constructor already handles all adult-specific parameters
-        super().__init__(unique_id, model, position, agent_type, agents)
+        # Fix parameter order to match SchoolAgent
+        super().__init__(unique_id, model, agent_type, position, agents)
+        self.response_delay = random.randint(2, 5)  # 2-5 time steps delay
 
-        # Adult-specific behavior is initialized in the parent class
-        # We only keep this class for backward compatibility and potential future expansion
+    # Adult-specific behaviors can be added here as needed
+    # For now we're just using the base SchoolAgent behavior

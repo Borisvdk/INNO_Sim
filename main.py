@@ -17,8 +17,184 @@ SCHOOL_WIDTH = 600
 SCHOOL_HEIGHT = 400
 
 
+def line_segments_intersect(x1, y1, x2, y2, x3, y3, x4, y4):
+    """
+    Check if two line segments intersect.
+    """
+    # Calculate directions
+    d1x = x2 - x1
+    d1y = y2 - y1
+    d2x = x4 - x3
+    d2y = y4 - y3
+
+    # Calculate the determinant
+    determinant = d1x * d2y - d1y * d2x
+
+    # If determinant is very close to zero, lines are parallel
+    if abs(determinant) < 1e-8:
+        return False
+
+    # Calculate parameters for the intersection point
+    s = ((x1 - x3) * d2y - (y1 - y3) * d2x) / determinant
+    t = ((x1 - x3) * d1y - (y1 - y3) * d1x) / determinant
+
+    # Check if the intersection is within both line segments
+    return 0 <= s <= 1 and 0 <= t <= 1
+
+
+def point_in_rectangle(x, y, rect_x1, rect_y1, rect_x2, rect_y2):
+    """Check if a point is inside a rectangle."""
+    return (rect_x1 <= x <= rect_x2 and rect_y1 <= y <= rect_y2)
+
+
+def line_intersects_rectangle(line_x1, line_y1, line_x2, line_y2, rect_x1, rect_y1, rect_x2, rect_y2):
+    """
+    Check if a line intersects with a rectangle.
+    """
+    # Check if either endpoint is inside the rectangle
+    if point_in_rectangle(line_x1, line_y1, rect_x1, rect_y1, rect_x2, rect_y2) or \
+            point_in_rectangle(line_x2, line_y2, rect_x1, rect_y1, rect_x2, rect_y2):
+        return True
+
+    # Check if line intersects with any of the four edges of the rectangle
+    rect_edges = [
+        (rect_x1, rect_y1, rect_x2, rect_y1),  # Top edge
+        (rect_x1, rect_y2, rect_x2, rect_y2),  # Bottom edge
+        (rect_x1, rect_y1, rect_x1, rect_y2),  # Left edge
+        (rect_x2, rect_y1, rect_x2, rect_y2)  # Right edge
+    ]
+
+    for edge_x1, edge_y1, edge_x2, edge_y2 in rect_edges:
+        if line_segments_intersect(
+                line_x1, line_y1, line_x2, line_y2,
+                edge_x1, edge_y1, edge_x2, edge_y2
+        ):
+            return True
+
+    return False
+
+
+def visualize_line_of_sight(model, screen, scale_factor, shooter_agent=None):
+    """
+    Visualize the line of sight for the shooter agent.
+    """
+    # Find a shooter if none provided
+    if shooter_agent is None:
+        for agent in model.schedule:
+            if hasattr(agent, 'is_shooter') and agent.is_shooter:
+                shooter_agent = agent
+                break
+
+        if shooter_agent is None:
+            return  # No shooter found
+
+    # Get shooter position
+    shooter_x, shooter_y = shooter_agent.position
+    screen_shooter_x = int(shooter_x * scale_factor)
+    screen_shooter_y = int(shooter_y * scale_factor)
+
+    # Create a semi-transparent surface for lines
+    temp_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+
+    # Visualize line of sight to all other agents
+    for agent in model.schedule:
+        if agent == shooter_agent:
+            continue
+
+        # Get agent position
+        agent_x, agent_y = agent.position
+        screen_agent_x = int(agent_x * scale_factor)
+        screen_agent_y = int(agent_y * scale_factor)
+
+        # Check line of sight
+        has_sight = has_line_of_sight(shooter_agent.position, agent.position, model.walls)
+
+        # Draw line with appropriate color
+        if has_sight:
+            # Draw a solid green line for visible agents
+            pygame.draw.line(
+                temp_surface,
+                (0, 255, 0, 180),  # Semi-transparent green
+                (screen_shooter_x, screen_shooter_y),
+                (screen_agent_x, screen_agent_y),
+                2
+            )
+        else:
+            # Draw a semi-transparent red line for non-visible agents
+            pygame.draw.line(
+                temp_surface,
+                (255, 0, 0, 64),  # Very transparent red
+                (screen_shooter_x, screen_shooter_y),
+                (screen_agent_x, screen_agent_y),
+                1
+            )
+
+    # Blit the temporary surface to the screen
+    screen.blit(temp_surface, (0, 0))
+
+
+def has_line_of_sight(start_pos, end_pos, walls):
+    """
+    Check if there's a line of sight between start_pos and end_pos.
+
+    Args:
+        start_pos: Tuple (x, y) of the starting position
+        end_pos: Tuple (x, y) of the ending position
+        walls: List of wall coordinates (x_min, y_min, x_max, y_max)
+
+    Returns:
+        True if there's a clear line of sight, False if a wall blocks the view
+    """
+    start_x, start_y = start_pos
+    end_x, end_y = end_pos
+
+    # Check each wall for intersection
+    for wall in walls:
+        if line_intersects_rectangle(
+                start_x, start_y, end_x, end_y,
+                wall[0], wall[1], wall[2], wall[3]
+        ):
+            return False  # Wall blocks line of sight
+
+    # No walls block the view
+    return True
+
+
+def visualize_safe_spawn_areas(model, screen, scale_factor):
+    """
+    Visualize the areas where agents can safely spawn (not in walls).
+    """
+    # Create a temporary surface for drawing with alpha
+    temp_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+
+    # Sample a grid of points and check if they're in a wall
+    grid_step = 10  # Controls the density of sampling points
+
+    for x in range(0, model.width, grid_step):
+        for y in range(0, model.height, grid_step):
+            # Check if position is inside any wall
+            is_in_wall = False
+            for wall in model.walls:
+                wall_x1, wall_y1, wall_x2, wall_y2 = wall
+                if (wall_x1 <= x <= wall_x2 and wall_y1 <= y <= wall_y2):
+                    is_in_wall = True
+                    break
+
+            # Convert to screen coordinates
+            screen_x = int(x * scale_factor)
+            screen_y = int(y * scale_factor)
+
+            # Draw a dot
+            color = (255, 0, 0, 100) if is_in_wall else (0, 255, 0, 40)  # Red for unsafe, green for safe
+            radius = 3
+            pygame.draw.circle(temp_surface, color, (screen_x, screen_y), radius)
+
+    # Draw the surface
+    screen.blit(temp_surface, (0, 0))
+
+
 def run_pygame_simulation():
-    """Optimized pygame simulation with continuous time."""
+    """Optimized pygame simulation with visualization enhancements."""
     # Import agent classes (to avoid circular imports)
     from agents.studentagent import StudentAgent
     from agents.adultagent import AdultAgent
@@ -85,6 +261,12 @@ def run_pygame_simulation():
         True, COLORS["BLACK"]
     )
 
+    # Add visualization controls description
+    viz_help_text = font.render(
+        "V: Toggle Line of Sight | B: Toggle Safe Areas",
+        True, COLORS["BLACK"]
+    )
+
     # Time tracking variables
     clock = pygame.time.Clock()
     last_update_time = time.time()
@@ -96,6 +278,10 @@ def run_pygame_simulation():
     fps_samples = []
     fps_update_time = time.time()
     current_fps = 0
+
+    # Visualization toggle flags
+    show_line_of_sight = False
+    show_safe_areas = False
 
     # Main simulation loop
     running = True
@@ -129,6 +315,13 @@ def run_pygame_simulation():
                         adult = AdultAgent(len(model.schedule), model, (x, y), "adult", model.schedule)
                         model.schedule.append(adult)
                         model.spatial_grid.update_agent(adult)
+                # Visualization toggle controls
+                elif event.key == pygame.K_v:
+                    show_line_of_sight = not show_line_of_sight
+                    print(f"Line of sight visualization: {'ON' if show_line_of_sight else 'OFF'}")
+                elif event.key == pygame.K_b:
+                    show_safe_areas = not show_safe_areas
+                    print(f"Safe areas visualization: {'ON' if show_safe_areas else 'OFF'}")
 
         # Time calculations
         current_time = time.time()
@@ -142,6 +335,10 @@ def run_pygame_simulation():
 
         # Draw background (with walls)
         screen.blit(background, (0, 0))
+
+        # Visualize safe areas if enabled
+        if show_safe_areas:
+            visualize_safe_spawn_areas(model, screen, scale_factor)
 
         # Pre-calculate draw lists for batch rendering
         circles_to_draw = []
@@ -188,6 +385,10 @@ def run_pygame_simulation():
         for color, start, end, width in lines_to_draw:
             pygame.draw.line(screen, color, start, end, width)
 
+        # Visualize line of sight if enabled
+        if show_line_of_sight:
+            visualize_line_of_sight(model, screen, scale_factor)
+
         # Process and draw active shots efficiently
         current_sim_time = model.simulation_time
         shots_to_remove = []
@@ -233,12 +434,22 @@ def run_pygame_simulation():
         count_text = font.render(f"Students: {student_count}, Adults: {adult_count}", True, COLORS["BLACK"])
         fps_text = font.render(f"FPS: {current_fps:.1f}", True, COLORS["BLACK"])
 
+        # Visualization status text
+        los_status = "ON" if show_line_of_sight else "OFF"
+        safe_status = "ON" if show_safe_areas else "OFF"
+        viz_status_text = font.render(
+            f"Line of Sight: {los_status} | Safe Areas: {safe_status}",
+            True, COLORS["BLACK"]
+        )
+
         # Draw UI text
         screen.blit(time_text, (10, 10))
         screen.blit(speed_text, (10, 40))
         screen.blit(count_text, (10, 70))
         screen.blit(fps_text, (10, 100))
-        screen.blit(help_text, (10, screen_height - 30))
+        screen.blit(viz_status_text, (10, 130))
+        screen.blit(help_text, (10, screen_height - 50))
+        screen.blit(viz_help_text, (10, screen_height - 25))
 
         # Update display once per frame
         pygame.display.flip()
