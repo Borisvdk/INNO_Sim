@@ -5,6 +5,7 @@ from schoolmodel import SchoolModel
 from visualization import Visualizer
 from agents.studentagent import StudentAgent
 from agents.adultagent import AdultAgent
+from dijkstra_test import astar
 
 # Simulation Parameters
 N_STUDENTS = 100
@@ -47,6 +48,7 @@ def run_pygame_simulation():
     last_update_time = time.time()
     simulation_time = 0.0
     sim_speed = 1.0
+    emergency = False
 
     # FPS tracking with improved accuracy
     fps_samples = []
@@ -86,6 +88,8 @@ def run_pygame_simulation():
                 elif event.key == pygame.K_b:
                     show_safe_areas = not show_safe_areas
                     print(f"Safe areas visualization: {'ON' if show_safe_areas else 'OFF'}")
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+                    model.run_to_exit()
 
         # Time calculations
         current_time = time.time()

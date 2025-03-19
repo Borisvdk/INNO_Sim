@@ -1,6 +1,8 @@
 import math
 import random
+from dijkstra_test import astar
 
+HEIGHT, WIDTH = 1200, 800
 
 class AgentFactory:
     """Factory class for creating different types of agents."""
@@ -353,3 +355,19 @@ class SchoolModel:
             self.spatial_grid.remove_agent(agent)
             # Then remove from schedule
             self.schedule.remove(agent)
+
+    def run_to_exit(self):
+        for student in self.schedule:
+            if student.agent_type == 'student':
+                exits = [
+                    (student.position[0], 0),              # Top edge
+                    (student.position[0], HEIGHT),         # Bottom edge
+                    (0, student.position[1]),              # Left edge
+                    (WIDTH, student.position[1])          # Right edge
+                ]
+                closest_exit = min(exits, key=lambda ex: math.hypot(student.position[0] - ex[0], student.position[1] - ex[1]))
+                path = astar((student.position[0], student.position[1]), closest_exit, self.walls)
+                if path:
+                    student.path = path
+                else:
+                    print(f"No path found for student at ({student.position[0]}, {student.position[1]})")

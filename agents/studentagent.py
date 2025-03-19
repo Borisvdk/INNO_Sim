@@ -3,6 +3,8 @@ import random
 from agents.schoolagent import SchoolAgent
 from utilities import has_line_of_sight
 
+WIDTH, HEIGHT = 1200, 800
+
 
 class StudentAgent(SchoolAgent):
     """Agent class for students with potential shooter behaviors."""
@@ -16,6 +18,9 @@ class StudentAgent(SchoolAgent):
         self.grab_weapon_prob = 0.05
         self.state = "Normal"
 
+        self.path = []
+        self.reached_exit = False
+
         # Shooter-specific attributes
         self.is_shooter = False
         self.last_shot_time = 0.0
@@ -27,12 +32,27 @@ class StudentAgent(SchoolAgent):
         self.search_start_time = 0
         self.search_direction_change_time = 0
 
+    def at_exit(self):
+        return self.position[0] <= 0 or self.position[0] >= WIDTH or self.position[1] <= 0 or self.position[1] >= HEIGHT
+
     def step_continuous(self, dt):
         """Override step_continuous with shooter behavior and wall awareness"""
         if not self.is_shooter:
             # Use standard movement for non-shooters
             super().step_continuous(dt)
             return
+        
+        if self.path:
+            target_x, target_y = self.path[0]
+            dx, dy = target_x - self.x, target_y - self.y
+            dist = math.hypot(dx, dy)
+            
+            if dist < self.max_speed:
+                self.x, self.y = target_x, target_y
+                self.path.pop(0)
+            else:
+                self.position[0] += self.max_speed * dx / dist
+                self.position[1] += self.max_speed * dy / dist
 
         # Shooter-specific behavior with line of sight
         current_time = self.model.simulation_time
@@ -184,3 +204,5 @@ class StudentAgent(SchoolAgent):
             self.search_start_time = self.model.simulation_time
             # More dramatic direction change after long search
             self.direction = random.uniform(0, 2 * math.pi)
+
+        
