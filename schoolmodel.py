@@ -1,5 +1,7 @@
 import math
 import random
+
+import pygame
 from dijkstra_test import astar
 
 HEIGHT, WIDTH = 1200, 800
@@ -120,7 +122,7 @@ class SchoolModel:
 
         # Define walls (can be replaced with more complex layout)
         self.walls = [
-            (20, 20, 580, 22),  # top wall (horizontal)
+            (20, 20, 500, 22),  # top wall (horizontal)
             (20, 195, 250, 197),  # middle left (horizontal)
             (340, 195, 580, 197),  # middle right (horizontal)
             (20, 375, 580, 377),  # bottom wall (horizontal)
@@ -358,6 +360,7 @@ class SchoolModel:
 
     def run_to_exit(self):
         for student in self.schedule:
+            student.in_emergency = True
             if student.agent_type == 'student':
                 exits = [
                     (student.position[0], 0),              # Top edge

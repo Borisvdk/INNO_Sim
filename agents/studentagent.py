@@ -20,6 +20,7 @@ class StudentAgent(SchoolAgent):
 
         self.path = []
         self.reached_exit = False
+        self.in_emergency = False
 
         # Shooter-specific attributes
         self.is_shooter = False
@@ -38,21 +39,19 @@ class StudentAgent(SchoolAgent):
     def step_continuous(self, dt):
         """Override step_continuous with shooter behavior and wall awareness"""
         if not self.is_shooter:
+            if self.path:
+                target_x, target_y = self.path[0]
+                dx, dy = target_x - self.position[0], target_y - self.position[1]
+                dist = math.hypot(dx, dy)
+                
+                if dist < self.max_speed:
+                    self.position = (target_x, target_y)
+                    self.path.pop(0)
+                else:
+                    self.position = (self.position[0] + self.max_speed * dx / dist, self.position[1] + self.max_speed * dy / dist)
             # Use standard movement for non-shooters
             super().step_continuous(dt)
             return
-        
-        if self.path:
-            target_x, target_y = self.path[0]
-            dx, dy = target_x - self.x, target_y - self.y
-            dist = math.hypot(dx, dy)
-            
-            if dist < self.max_speed:
-                self.x, self.y = target_x, target_y
-                self.path.pop(0)
-            else:
-                self.position[0] += self.max_speed * dx / dist
-                self.position[1] += self.max_speed * dy / dist
 
         # Shooter-specific behavior with line of sight
         current_time = self.model.simulation_time
