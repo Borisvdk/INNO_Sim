@@ -413,16 +413,18 @@ class Visualizer:
             screen_y = int(y * self.scale_factor)
             scaled_radius = int(agent.radius * self.scale_factor)
 
-            # Determine color
             if agent.agent_type == "student":
                 if getattr(agent, "is_shooter", False):
-                    color = self.COLORS["GREEN"]
+                    color = self.COLORS["GREEN"]  # Schutter-studenten
                 elif getattr(agent, "has_weapon", False):
-                    color = self.COLORS["ARMED_STUDENT"]
+                    color = self.COLORS["ARMED_STUDENT"]  # Gewapende studenten (zoals eerder ingesteld)
                 else:
-                    color = self.COLORS["BLUE"]
+                    color = self.COLORS["BLUE"]  # Normale studenten
             else:  # adult
-                color = self.COLORS["ARMED_ADULT"] if getattr(agent, "has_weapon", False) else self.COLORS["RED"]
+                if getattr(agent, "has_weapon", False):
+                    color = (255, 255, 0)  # Geel voor gewapende volwassenen
+                else:
+                    color = self.COLORS["RED"]  # Normale volwassenen (bijv. rood)
 
             # Add circle to draw list
             circles_to_draw.append((color, (screen_x, screen_y), scaled_radius))

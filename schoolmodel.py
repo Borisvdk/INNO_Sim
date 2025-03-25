@@ -110,11 +110,12 @@ class SchoolModel:
     """Main model class for the school simulation."""
 
     def __init__(self, n_students=config.INITIAL_STUDENTS, n_adults=config.INITIAL_ADULTS,
-                 width=config.SIM_WIDTH, height=config.SIM_HEIGHT):
+                 width=config.SIM_WIDTH, height=config.SIM_HEIGHT, adult_weapon_percentage=config.ADULT_WEAPEN_PROBABILITY):
         self.num_students = n_students
         self.num_adults = n_adults
         self.width = width
         self.height = height
+        self.adult_weapon_percentage = adult_weapon_percentage  # Nieuw: percentage volwassenen met een wapen
         self.running = True
         self.schedule = []  # List of all agents
         self.active_shots = []  # List to store active shots
@@ -185,6 +186,11 @@ class SchoolModel:
         for i in range(self.num_adults):
             position = all_positions[i + self.num_students]
             agent = AgentFactory.create_agent("adult", i + self.num_students, self, position)
+            # Controleer of deze volwassen agent een wapen krijgt:
+            if random.random() < self.adult_weapon_percentage:
+                agent.has_weapon = True
+                agent.color = (255, 255, 0)  # Gele kleur
+            # Indien geen wapen, blijft de agent zijn standaardkleur behouden
             self.schedule.append(agent)
             self.spatial_grid.update_agent(agent)
 
