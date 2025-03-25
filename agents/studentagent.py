@@ -11,6 +11,7 @@ WIDTH, HEIGHT = 1200, 800
 class StudentAgent(SchoolAgent):
     """Agent class for students with potential shooter behaviors."""
 
+
     def __init__(self, unique_id, model, position, agent_type):
         # Initialize parent class
         super().__init__(unique_id, model, agent_type, position)
@@ -41,6 +42,9 @@ class StudentAgent(SchoolAgent):
         self.search_start_time = 0
         self.search_direction_change_time = 0
 
+        # Shooter timeout tracking
+        self.shooter_start_time = 0.0  # To track when the shooter becomes active
+
     def at_exit(self):
         return self.position[0] <= 0 or self.position[0] >= WIDTH or self.position[1] <= 0 or self.position[1] >= HEIGHT
 
@@ -53,7 +57,22 @@ class StudentAgent(SchoolAgent):
         # Ensure students use their normal speed
         normal_speed = getattr(self, 'normal_speed', 1.0)  # Use default speed if not set
 
+        # If the agent is a shooter, track the time they have been active
+        if self.is_shooter:
+            current_time = self.model.simulation_time
+
+            # Initialize the shooter start time if it's not set yet
+            if self.shooter_start_time == 0.0:
+                self.shooter_start_time = current_time
+
+            # If 10 seconds have passed since the shooter became active, remove the shooter
+            if current_time - self.shooter_start_time >= 10.0:
+                print(f"Shooter {self.unique_id} removed from simulation after 10 seconds.")
+                self.model.remove_agent(self)
+                return  # End the step to remove the shooter immediately
+
         if not self.is_shooter:
+            # Normal student behavior
             if self.path:
                 target_x, target_y = self.path[0]
                 dx, dy = target_x - self.position[0], target_y - self.position[1]
@@ -84,7 +103,6 @@ class StudentAgent(SchoolAgent):
                             self.position[0] + random.uniform(-0.25, 0.25),
                             self.position[1] + random.uniform(-0.25, 0.25)
                         )
-
 
             # If the agent is a shooter, follow the shooter logic
             super().step_continuous(dt)
