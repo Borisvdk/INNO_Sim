@@ -1,5 +1,6 @@
 import math
 
+
 def line_segments_intersect(x1, y1, x2, y2, x3, y3, x4, y4):
     """
     Check if two line segments intersect.
@@ -24,9 +25,11 @@ def line_segments_intersect(x1, y1, x2, y2, x3, y3, x4, y4):
     # Check if the intersection is within both line segments
     return 0 <= s <= 1 and 0 <= t <= 1
 
+
 def point_in_rectangle(x, y, rect_x1, rect_y1, rect_x2, rect_y2):
     """Check if a point is inside a rectangle."""
     return (rect_x1 <= x <= rect_x2 and rect_y1 <= y <= rect_y2)
+
 
 def line_intersects_rectangle(line_x1, line_y1, line_x2, line_y2, rect_x1, rect_y1, rect_x2, rect_y2):
     """
@@ -54,6 +57,7 @@ def line_intersects_rectangle(line_x1, line_y1, line_x2, line_y2, rect_x1, rect_
 
     return False
 
+
 def has_line_of_sight(start_pos, end_pos, walls):
     """
     Check if there's a line of sight between start_pos and end_pos.
@@ -80,11 +84,13 @@ def has_line_of_sight(start_pos, end_pos, walls):
     # No walls block the view
     return True
 
+
 def distance_squared(pos1, pos2):
     """Calculate squared distance between two positions"""
     dx = pos1[0] - pos2[0]
     dy = pos1[1] - pos2[1]
     return dx * dx + dy * dy
+
 
 def cast_ray(start_pos, angle, max_distance, walls):
     """
@@ -141,6 +147,7 @@ def cast_ray(start_pos, angle, max_distance, walls):
                     closest_dist_squared = dist_squared
 
     return closest_intersection
+
 
 def line_line_intersection(x1, y1, x2, y2, x3, y3, x4, y4):
     """
