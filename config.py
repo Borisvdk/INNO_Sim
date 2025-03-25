@@ -47,7 +47,7 @@ SHOOTING_RANGE = 25.0  # Units
 HIT_PROBABILITY = 0.7  # Probability to hit target (0.5 = 50%)
 SHOOTER_SEARCH_DURATION = 5.0  # How long shooter searches before changing strategy
 STEAL_RANGE = 10.0  # Units within which a student can attempt to steal
-STEAL_PROBABILITY = 0.00001  # Probability per step to attempt stealing
+STEAL_PROBABILITY = 0.001  # Probability per step to attempt stealing
 
 # Response & awareness parameters
 ADULT_RESPONSE_DELAY_RANGE = (2, 5)  # (min, max) time steps

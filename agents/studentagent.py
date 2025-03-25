@@ -268,7 +268,6 @@ class StudentAgent(SchoolAgent):
                     agent.has_weapon = False
                     self.has_weapon = True
                     self.is_shooter = True
-                    self.model.has_active_shooter = True
                     print(f"Student {self.unique_id} stole a weapon from adult {agent.unique_id} and became a shooter!")
                     break
 

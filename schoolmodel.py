@@ -134,6 +134,7 @@ class SchoolModel:
         self.active_shots = []  # List to store active shots (e.g., projectiles)
         self.simulation_time = 0.0  # Total simulated time in seconds
         self.active_shooters = set()  # Set to track all active shooters
+        self.tick_count = 0
         self.shooter_check_interval = config.SHOOTER_CHECK_INTERVAL
         self.last_shooter_check_time = 0.0
         self.shooter_emergence_probability = config.SHOOTER_EMERGENCE_PROBABILITY
@@ -278,15 +279,6 @@ class SchoolModel:
         print(f"MANUAL ALERT: Student {random_student.unique_id} has become an active shooter "
               f"at time {self.simulation_time:.1f}s")
         return True
-
-    def remove_agent(self, agent):
-        """Remove an agent from the simulation."""
-        if agent in self.schedule:  # Check if the agent is in the simulation
-            if agent in self.active_shooters:  # If it’s a shooter, remove it from the set
-                self.active_shooters.remove(agent)
-                print(f"Shooter {agent.unique_id} has been removed from the simulation.")
-            self.spatial_grid.remove_agent(agent)  # Remove from spatial grid
-            self.schedule.remove(agent)  # Remove from scheduler
 
     @property
     def has_active_shooter(self):
