@@ -135,6 +135,7 @@ class SchoolModel:
         self.active_shots = []  # List to store active shots
         self.simulation_time = 0.0  # Total simulated time
         self.has_active_shooter = False  # Tracks if there's currently an active shooter
+        self.tick_count = 0
 
         # Parameters for random shooter emergence (from config)
         self.shooter_check_interval = config.SHOOTER_CHECK_INTERVAL
@@ -470,16 +471,20 @@ class SchoolModel:
 
         # If there are students left to start fleeing, pick one at random
         if non_fleeing_students:
-            student = random.choice(non_fleeing_students)
-            print(f"🚨 Student at {student.position} is now evacuating.")
+            if self.tick_count >= 5:
+                self.tick_count = 0
+                student = random.choice(non_fleeing_students)
+                print(f"🚨 Student at {student.position} is now evacuating.")
 
-            # Find the path to the single exit
-            exit_point = (540, 20)  # Center of the exit
-            path = astar((student.position[0], student.position[1]), exit_point, wall_rects)
+                # Find the path to the single exit
+                exit_point = (540, 20)  # Center of the exit
+                path = astar((student.position[0], student.position[1]), exit_point, wall_rects)
 
-            if path:
-                student.path = path
-                student.in_emergency = True  # Mark student as actively fleeing
+                if path:
+                    student.path = path
+                    student.in_emergency = True  # Mark student as actively fleeing
+                else:
+                    print(f"⚠ No path found for student at {student.position}")
             else:
-                print(f"⚠ No path found for student at {student.position}")
+                self.tick_count += 1
 
