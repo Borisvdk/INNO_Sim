@@ -358,19 +358,34 @@ class SchoolModel:
             # Then remove from schedule
             self.schedule.remove(agent)
 
+
     def run_to_exit(self):
+        """Makes all student agents find the shortest path to the single school exit."""
+        
+        # Define the single exit as a rectangle
+        school_exit = pygame.Rect(500, 20, 80, 2)  # (x, y, width, height)
+
+        # Convert walls to pygame.Rect objects for collision detection
+        wall_rects = [pygame.Rect(x1, y1, x2 - x1, y2 - y1) for (x1, y1, x2, y2) in self.walls]
+
+        print("\n[DEBUG] Running evacuation process...")
+
         for student in self.schedule:
-            student.in_emergency = True
             if student.agent_type == 'student':
-                exits = [
-                    (student.position[0], 0),              # Top edge
-                    (student.position[0], HEIGHT),         # Bottom edge
-                    (0, student.position[1]),              # Left edge
-                    (WIDTH, student.position[1])          # Right edge
-                ]
-                closest_exit = min(exits, key=lambda ex: math.hypot(student.position[0] - ex[0], student.position[1] - ex[1]))
-                path = astar((student.position[0], student.position[1]), closest_exit, self.walls)
+                print(f"Student at {student.position} attempting to find a path.")
+
+                # Check that the student is not inside a wall
+                student_rect = pygame.Rect(student.position[0] - 5, student.position[1] - 5, 10, 10)
+                if any(student_rect.colliderect(wall) for wall in wall_rects):
+                    print(f"ERROR: Student at {student.position} is inside a wall!")
+                    continue  # Skip pathfinding for this student
+
+                # Find path to the **single exit**
+                exit_point = (540, 20)  # Center of the exit
+                path = astar((student.position[0], student.position[1]), exit_point, wall_rects)
+
                 if path:
                     student.path = path
+                    print(f"Path found! Student at {student.position} moving to exit.")
                 else:
-                    print(f"No path found for student at ({student.position[0]}, {student.position[1]})")
+                    print(f"⚠ No path found for student at {student.position}")

@@ -60,9 +60,11 @@ class Student:
     def at_exit(self):
         return self.x <= 0 or self.x >= WIDTH or self.y <= 0 or self.y >= HEIGHT
 
-# A* Pathfinding algorithm
 def astar(start, goal, walls):
+    """Finds the shortest path from start to goal using A* while avoiding walls."""
+    
     def heuristic(a, b):
+        """Euclidean distance heuristic function."""
         return math.hypot(a[0] - b[0], a[1] - b[1])
 
     open_set = []
@@ -74,6 +76,7 @@ def astar(start, goal, walls):
     while open_set:
         _, current = heapq.heappop(open_set)
 
+        # Stop if we are close enough to the goal
         if heuristic(current, goal) < 10:
             path = []
             while current in came_from:
@@ -82,21 +85,27 @@ def astar(start, goal, walls):
             path.reverse()
             return path
 
-        step_size = 10
-        directions = [(step_size, 0), (-step_size, 0), (0, step_size), (0, -step_size),
-                      (step_size, step_size), (-step_size, step_size),
-                      (step_size, -step_size), (-step_size, -step_size)]
+        # Generate more neighbor points with finer granularity
+        step_size = 5  # Reduced step size for better accuracy
+        directions = [
+            (step_size, 0), (-step_size, 0), (0, step_size), (0, -step_size),
+            (step_size, step_size), (-step_size, step_size),
+            (step_size, -step_size), (-step_size, -step_size)
+        ]
 
         for dx, dy in directions:
             neighbor = (current[0] + dx, current[1] + dy)
 
+            # Ensure neighbor is inside screen boundaries
             if not (0 <= neighbor[0] <= WIDTH and 0 <= neighbor[1] <= HEIGHT):
                 continue
 
+            # Collision check with walls
             point_rect = pygame.Rect(neighbor[0] - 2, neighbor[1] - 2, 4, 4)
             if any(point_rect.colliderect(wall) for wall in walls):
                 continue
 
+            # Update pathfinding scores
             tentative_g_score = g_score[current] + heuristic(current, neighbor)
 
             if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
@@ -105,7 +114,7 @@ def astar(start, goal, walls):
                 f_score[neighbor] = tentative_g_score + heuristic(neighbor, goal)
                 heapq.heappush(open_set, (f_score[neighbor], neighbor))
 
-    return []  # No path found
+    return []  # No valid path found
 
 def main():
     clock = pygame.time.Clock()

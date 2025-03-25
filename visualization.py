@@ -321,7 +321,7 @@ class Visualizer:
                     direction_y = vy / speed * (scaled_radius + 2)
                     lines_to_draw.append(
                         (self.COLORS["BLACK"], (screen_x, screen_y),
-                         (screen_x + direction_x, screen_y + direction_y), 1)
+                        (screen_x + direction_x, screen_y + direction_y), 1)
                     )
 
         # Draw all circles in batch
@@ -331,6 +331,14 @@ class Visualizer:
         # Draw all lines in batch
         for color, start, end, width in lines_to_draw:
             pygame.draw.line(self.screen, color, start, end, width)
+
+        # 🔥 Draw Exit Lines (Green)
+        line_thickness = 5  # Adjust thickness if needed
+
+        # Draw the single school exit
+        exit_color = (0, 255, 0)  # Green
+        pygame.draw.line(self.screen, exit_color, (500 * 2, 20 * 2), (580 * 2, 20 * 2), 5)  # School exit line
+
 
         # Visualize line of sight if enabled
         if show_line_of_sight:
@@ -386,3 +394,4 @@ class Visualizer:
 
         # Update display
         pygame.display.flip()
+

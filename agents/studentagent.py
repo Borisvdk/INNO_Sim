@@ -1,5 +1,7 @@
 import math
 import random
+
+import pygame
 from agents.schoolagent import SchoolAgent
 from utilities import has_line_of_sight
 
@@ -37,21 +39,45 @@ class StudentAgent(SchoolAgent):
         return self.position[0] <= 0 or self.position[0] >= WIDTH or self.position[1] <= 0 or self.position[1] >= HEIGHT
 
     def step_continuous(self, dt):
-        """Override step_continuous with shooter behavior and wall awareness"""
+        """Moves students along their path and removes them if they reach the exit."""
+
+        # Define the exit area slightly larger to prevent blocking
+        school_exit = pygame.Rect(500, 18, 80, 6)  # Increased height for better detection
+
         if not self.is_shooter:
             if self.path:
                 target_x, target_y = self.path[0]
                 dx, dy = target_x - self.position[0], target_y - self.position[1]
                 dist = math.hypot(dx, dy)
-                
+
                 if dist < self.max_speed:
                     self.position = (target_x, target_y)
                     self.path.pop(0)
                 else:
-                    self.position = (self.position[0] + self.max_speed * dx / dist, self.position[1] + self.max_speed * dy / dist)
-            # Use standard movement for non-shooters
-            super().step_continuous(dt)
-            return
+                    self.position = (
+                        self.position[0] + self.max_speed * dx / dist,
+                        self.position[1] + self.max_speed * dy / dist
+                    )
+
+            # Check if student is within the exit area
+            student_rect = pygame.Rect(self.position[0] - 5, self.position[1] - 5, 10, 10)
+            if student_rect.colliderect(school_exit):
+                print(f"✅ Student at {self.position} exited safely!")
+                self.model.remove_agent(self)
+                return
+
+            # Small nudge to move overlapping students apart
+            for other in self.model.schedule:
+                if other != self and other.agent_type == "student":
+                    other_rect = pygame.Rect(other.position[0] - 5, other.position[1] - 5, 10, 10)
+                    if student_rect.colliderect(other_rect):
+                        # Apply a small random push to avoid overlap
+                        self.position = (self.position[0] + random.uniform(-1, 1), self.position[1] + random.uniform(-1, 1))
+
+            return  # Prevent shooter behavior from running
+
+        # If the agent is a shooter, follow the shooter logic
+        super().step_continuous(dt)
 
         # Shooter-specific behavior with line of sight
         current_time = self.model.simulation_time
