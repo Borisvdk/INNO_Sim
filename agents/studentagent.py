@@ -40,10 +40,13 @@ class StudentAgent(SchoolAgent):
         return self.position[0] <= 0 or self.position[0] >= WIDTH or self.position[1] <= 0 or self.position[1] >= HEIGHT
 
     def step_continuous(self, dt):
-        """Moves students along their path and removes them if they reach the exit."""
+        """Moves students at normal speed toward the exit and removes them if they reach it."""
+        
+        # Define the exit area
+        school_exit = pygame.Rect(500, 18, 80, 6)  # Slightly larger for better detection
 
-        # Define the exit area slightly larger to prevent blocking
-        school_exit = pygame.Rect(500, 18, 80, 6)  # Increased height for better detection
+        # Ensure students use their normal speed
+        normal_speed = getattr(self, 'normal_speed', 1.0)  # Use default speed if not set
 
         if not self.is_shooter:
             if self.path:
@@ -51,31 +54,33 @@ class StudentAgent(SchoolAgent):
                 dx, dy = target_x - self.position[0], target_y - self.position[1]
                 dist = math.hypot(dx, dy)
 
-                if dist < self.max_speed:
+                if dist < normal_speed:  # Move at normal speed
                     self.position = (target_x, target_y)
                     self.path.pop(0)
                 else:
                     self.position = (
-                        self.position[0] + self.max_speed * dx / dist,
-                        self.position[1] + self.max_speed * dy / dist
+                        self.position[0] + (dx / dist) * normal_speed,
+                        self.position[1] + (dy / dist) * normal_speed
                     )
 
-            # Check if student is within the exit area
+            # Check if student is inside the exit area
             student_rect = pygame.Rect(self.position[0] - 5, self.position[1] - 5, 10, 10)
             if student_rect.colliderect(school_exit):
                 print(f"✅ Student at {self.position} exited safely!")
                 self.model.remove_agent(self)
                 return
 
-            # Small nudge to move overlapping students apart
+            # Prevent students from getting stuck by nudging them apart slightly
             for other in self.model.schedule:
                 if other != self and other.agent_type == "student":
                     other_rect = pygame.Rect(other.position[0] - 5, other.position[1] - 5, 10, 10)
                     if student_rect.colliderect(other_rect):
-                        # Apply a small random push to avoid overlap
-                        self.position = (self.position[0] + random.uniform(-1, 1), self.position[1] + random.uniform(-1, 1))
+                        self.position = (
+                            self.position[0] + random.uniform(-0.5, 0.5),
+                            self.position[1] + random.uniform(-0.5, 0.5)
+                        )
 
-            return  # Prevent shooter behavior from running
+            return  # Prevent shooter logic from running
 
         # If the agent is a shooter, follow the shooter logic
         super().step_continuous(dt)
