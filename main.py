@@ -6,21 +6,18 @@ from visualization import Visualizer
 from agents.studentagent import StudentAgent
 from agents.adultagent import AdultAgent
 from dijkstra_test import astar
-
-# Simulation Parameters
-N_STUDENTS = 100
-N_ADULTS = 20
-
-# School dimensions
-SCHOOL_WIDTH = 600
-SCHOOL_HEIGHT = 400
-
+import config
 
 def run_pygame_simulation():
     """Main function to run the school simulation with visualization."""
 
-    # Initialize model
-    model = SchoolModel(n_students=N_STUDENTS, n_adults=N_ADULTS, width=SCHOOL_WIDTH, height=SCHOOL_HEIGHT)
+    # Initialize model with parameters from config
+    model = SchoolModel(
+        n_students=config.INITIAL_STUDENTS,
+        n_adults=config.INITIAL_ADULTS,
+        width=config.SIM_WIDTH,
+        height=config.SIM_HEIGHT
+    )
 
     # Pygame initialization
     pygame.init()
@@ -39,8 +36,8 @@ def run_pygame_simulation():
         model.gunshot_sound = None
         model.kill_sound = None
 
-    # Create visualizer
-    screen_width, screen_height = 1200, 800
+    # Create visualizer with parameters from config
+    screen_width, screen_height = config.SCREEN_WIDTH, config.SCREEN_HEIGHT
     visualizer = Visualizer(model, screen_width=screen_width, screen_height=screen_height)
 
     # Time tracking variables
@@ -88,8 +85,14 @@ def run_pygame_simulation():
                 elif event.key == pygame.K_b:
                     show_safe_areas = not show_safe_areas
                     print(f"Safe areas visualization: {'ON' if show_safe_areas else 'OFF'}")
-                elif event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+                elif event.key == pygame.K_e:
                     model.run_to_exit()
+                    print("Emergency evacuation activated!")
+                elif event.key == pygame.K_x:  # New key for manually adding a shooter
+                    success = model.add_manual_shooter()
+                    if success:
+                        visualizer.show_shooter_alert()
+                        print("Manual shooter added to simulation!")
 
         # Time calculations
         current_time = time.time()
@@ -126,10 +129,9 @@ def run_pygame_simulation():
         )
 
         # Frame rate limiting
-        clock.tick(60)
+        clock.tick(config.FPS_LIMIT)
 
     pygame.quit()
-
 
 if __name__ == "__main__":
     run_pygame_simulation()
