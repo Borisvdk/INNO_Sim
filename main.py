@@ -16,7 +16,8 @@ def run_pygame_simulation():
         n_students=config.INITIAL_STUDENTS,
         n_adults=config.INITIAL_ADULTS,
         width=config.SIM_WIDTH,
-        height=config.SIM_HEIGHT
+        height=config.SIM_HEIGHT,
+        grid_file="grid.json"
     )
 
     # Pygame initialization

@@ -106,16 +106,30 @@ class SpatialGrid:
         return nearby_agents
 
 
+import math
+import random
+import os
+import pygame
+
+from grid_converter import integrate_grid_into_simulation  # Import our new function
+from dijkstra_test import astar
+import config
+
+HEIGHT, WIDTH = config.SCREEN_HEIGHT, config.SCREEN_WIDTH
+
+
 class SchoolModel:
     """Main model class for the school simulation."""
 
     def __init__(self, n_students=config.INITIAL_STUDENTS, n_adults=config.INITIAL_ADULTS,
-                 width=config.SIM_WIDTH, height=config.SIM_HEIGHT, adult_weapon_percentage=config.ADULT_WEAPEN_PROBABILITY):
+                 width=config.SIM_WIDTH, height=config.SIM_HEIGHT,
+                 adult_weapon_percentage=config.ADULT_WEAPEN_PROBABILITY,
+                 grid_file=None):  # Add grid_file parameter
         self.num_students = n_students
         self.num_adults = n_adults
         self.width = width
         self.height = height
-        self.adult_weapon_percentage = adult_weapon_percentage  # Nieuw: percentage volwassenen met een wapen
+        self.adult_weapon_percentage = adult_weapon_percentage
         self.running = True
         self.schedule = []  # List of all agents
         self.active_shots = []  # List to store active shots
@@ -130,15 +144,21 @@ class SchoolModel:
         # Initialize spatial grid
         self.spatial_grid = SpatialGrid(width, height, cell_size=10)
 
-        # Define walls (can be replaced with more complex layout)
-        self.walls = [
-            (20, 20, 500, 22),  # top wall (horizontal)
-            (20, 195, 250, 197),  # middle left (horizontal)
-            (340, 195, 580, 197),  # middle right (horizontal)
-            (20, 375, 580, 377),  # bottom wall (horizontal)
-            (20, 20, 22, 375),  # left wall (vertical)
-            (578, 20, 580, 375),  # right wall (vertical)
-        ]
+        # Define walls - either from grid file or default configuration
+        if grid_file and os.path.exists(grid_file):
+            print(f"Loading walls from grid file: {grid_file}")
+            self.walls = integrate_grid_into_simulation(grid_file, width, height)
+            print(f"Loaded {len(self.walls)} wall segments from grid file")
+        else:
+            print("Using default wall configuration")
+            self.walls = [
+                (20, 20, 500, 22),  # top wall (horizontal)
+                (20, 195, 250, 197),  # middle left (horizontal)
+                (340, 195, 580, 197),  # middle right (horizontal)
+                (20, 375, 580, 377),  # bottom wall (horizontal)
+                (20, 20, 22, 375),  # left wall (vertical)
+                (578, 20, 580, 375),  # right wall (vertical)
+            ]
 
         # Create wall grid structures
         self._create_wall_grid()
