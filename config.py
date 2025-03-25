@@ -15,7 +15,7 @@ INITIAL_STUDENTS = 100
 INITIAL_ADULTS = 20
 
 # Weapon odds
-ADULT_WEAPEN_PROBABILITY = 0.5
+ADULT_WEAPON_PROBABILITY = 0.5
 
 # Agent physical properties
 STUDENT_RADIUS = 3.0
@@ -43,9 +43,11 @@ WALL_AVOIDANCE_STRENGTH = 50.0
 SHOOTER_CHECK_INTERVAL = 10.0  # Seconds between checks for random shooter emergence
 SHOOTER_EMERGENCE_PROBABILITY = 0.01  # Probability per check (0.01 = 1%)
 SHOOTING_INTERVAL = 2.0  # Seconds between shots
-SHOOTING_RANGE = 10.0  # Units
-HIT_PROBABILITY = 0.5  # Probability to hit target (0.5 = 50%)
+SHOOTING_RANGE = 25.0  # Units
+HIT_PROBABILITY = 0.7  # Probability to hit target (0.5 = 50%)
 SHOOTER_SEARCH_DURATION = 5.0  # How long shooter searches before changing strategy
+STEAL_RANGE = 10.0  # Units within which a student can attempt to steal
+STEAL_PROBABILITY = 0.00001  # Probability per step to attempt stealing
 
 # Response & awareness parameters
 ADULT_RESPONSE_DELAY_RANGE = (2, 5)  # (min, max) time steps

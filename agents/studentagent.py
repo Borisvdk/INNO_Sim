@@ -1,6 +1,6 @@
 import math
 import random
-
+import config
 import pygame
 from agents.schoolagent import SchoolAgent
 from utilities import has_line_of_sight
@@ -83,6 +83,22 @@ class StudentAgent(SchoolAgent):
                 self.model.remove_agent(self)
                 return  # End the step to remove the shooter immediately
 
+        if not self.is_shooter and not self.has_weapon:
+            # Attempt to steal a weapon from nearby adults
+            nearby_agents = self.model.spatial_grid.get_nearby_agents(self.position, config.STEAL_RANGE)
+            for agent in nearby_agents:
+                if agent.agent_type == "adult" and agent.has_weapon:
+                    if random.random() < config.STEAL_PROBABILITY:
+                        # Stealing successful
+                        agent.has_weapon = False
+                        self.has_weapon = True
+                        self.is_shooter = True
+                        self.model.active_shooters.add(self)
+                        self.color = config.COLORS["GREEN"]
+                        print(f"Student {self.unique_id} stole a weapon from adult {agent.unique_id} "
+                              f"and became a shooter!")
+                        break  # Only steal from one adult per step
+
         if not self.is_shooter:
             # Normal student behavior
             if self.path:
@@ -110,6 +126,8 @@ class StudentAgent(SchoolAgent):
 
                 # Avoid collisions with other students
                 self._avoid_student_collisions()
+
+                self._check_steal_weapon()
             else:
                 # NORMAL MODE - roam around when no emergency path is set
                 # Use the parent class's continuous movement logic
@@ -226,6 +244,33 @@ class StudentAgent(SchoolAgent):
         # Update spatial grid if position changed
         if old_position != self.position:
             self.model.spatial_grid.update_agent(self)
+
+    def _check_steal_weapon(self):
+        """Check if the student can steal a weapon from an armed adult."""
+        if self.has_weapon or self.is_shooter:
+            return
+
+        # Find nearby adults within steal range
+        nearby_agents = self.model.spatial_grid.get_nearby_agents(self.position, config.STEAL_RANGE)
+        for agent in nearby_agents:
+            if agent.agent_type == "adult" and agent.has_weapon:
+                # Check distance and line of sight
+                dx = agent.position[0] - self.position[0]
+                dy = agent.position[1] - self.position[1]
+                distance_sq = dx ** 2 + dy ** 2
+                if distance_sq > config.STEAL_RANGE ** 2:
+                    continue
+                if not self.has_line_of_sight(agent.position):
+                    continue
+
+                # Attempt to steal
+                if random.random() < config.STEAL_PROBABILITY:
+                    agent.has_weapon = False
+                    self.has_weapon = True
+                    self.is_shooter = True
+                    self.model.has_active_shooter = True
+                    print(f"Student {self.unique_id} stole a weapon from adult {agent.unique_id} and became a shooter!")
+                    break
 
     def _avoid_student_collisions(self):
         """Helper method to prevent students from overlapping."""

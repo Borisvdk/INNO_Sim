@@ -1,6 +1,8 @@
 import math
 import random
-
+import os
+from grid_converter import integrate_grid_into_simulation
+import config
 import pygame
 from dijkstra_test import astar
 import config
@@ -106,25 +108,22 @@ class SpatialGrid:
         return nearby_agents
 
 
-import math
-import random
-import os
-import pygame
-
-from grid_converter import integrate_grid_into_simulation  # Import our new function
-from dijkstra_test import astar
-import config
-
-HEIGHT, WIDTH = config.SCREEN_HEIGHT, config.SCREEN_WIDTH
-
-
 class SchoolModel:
-    """Main model class for the school simulation."""
-
     def __init__(self, n_students=config.INITIAL_STUDENTS, n_adults=config.INITIAL_ADULTS,
                  width=config.SIM_WIDTH, height=config.SIM_HEIGHT,
-                 adult_weapon_percentage=config.ADULT_WEAPEN_PROBABILITY,
-                 grid_file=None):  # Add grid_file parameter
+                 adult_weapon_percentage=config.ADULT_WEAPON_PROBABILITY,
+                 grid_file=None):
+        """
+        Initialize the school simulation model.
+
+        Args:
+            n_students (int): Number of student agents.
+            n_adults (int): Number of adult agents.
+            width (float): Width of the simulation area.
+            height (float): Height of the simulation area.
+            adult_weapon_percentage (float): Probability an adult has a weapon.
+            grid_file (str, optional): Path to a grid file for walls.
+        """
         self.num_students = n_students
         self.num_adults = n_adults
         self.width = width
@@ -132,20 +131,15 @@ class SchoolModel:
         self.adult_weapon_percentage = adult_weapon_percentage
         self.running = True
         self.schedule = []  # List of all agents
-        self.active_shots = []  # List to store active shots
-        self.simulation_time = 0.0  # Total simulated time
-        self.has_active_shooter = False  # Tracks if there's currently an active shooter
-        self.tick_count = 0
-
-        # Parameters for random shooter emergence (from config)
+        self.active_shots = []  # List to store active shots (e.g., projectiles)
+        self.simulation_time = 0.0  # Total simulated time in seconds
+        self.active_shooters = set()  # Set to track all active shooters
         self.shooter_check_interval = config.SHOOTER_CHECK_INTERVAL
         self.last_shooter_check_time = 0.0
         self.shooter_emergence_probability = config.SHOOTER_EMERGENCE_PROBABILITY
+        self.spatial_grid = SpatialGrid(width, height, cell_size=10)  # Assumed spatial grid utility
 
-        # Initialize spatial grid
-        self.spatial_grid = SpatialGrid(width, height, cell_size=10)
-
-        # Define walls - either from grid file or default configuration
+        # Load walls from grid file or use default configuration
         if grid_file and os.path.exists(grid_file):
             print(f"Loading walls from grid file: {grid_file}")
             self.walls = integrate_grid_into_simulation(grid_file, width, height)
@@ -153,18 +147,15 @@ class SchoolModel:
         else:
             print("Using default wall configuration")
             self.walls = [
-                (20, 20, 500, 22),  # top wall (horizontal)
-                (20, 195, 250, 197),  # middle left (horizontal)
-                (340, 195, 580, 197),  # middle right (horizontal)
-                (20, 375, 580, 377),  # bottom wall (horizontal)
-                (20, 20, 22, 375),  # left wall (vertical)
-                (578, 20, 580, 375),  # right wall (vertical)
+                (20, 20, 500, 22),  # Top wall (horizontal)
+                (20, 195, 250, 197),  # Middle left (horizontal)
+                (340, 195, 580, 197),  # Middle right (horizontal)
+                (20, 375, 580, 377),  # Bottom wall (horizontal)
+                (20, 20, 22, 375),  # Left wall (vertical)
+                (578, 20, 580, 375),  # Right wall (vertical)
             ]
 
-        # Create wall grid structures
         self._create_wall_grid()
-
-        # Create all agents with safe positions
         self._create_all_agents()
 
     def _create_all_agents(self):
@@ -255,57 +246,52 @@ class SchoolModel:
             agent.step_continuous(dt)
 
     def _check_for_shooter_emergence(self):
-        """Check if a random student becomes a shooter"""
-        # Only proceed with a small probability
+        """Check if a random student spontaneously becomes a shooter."""
         if random.random() > self.shooter_emergence_probability:
             return
-
-        # Find all student agents
-        student_agents = [agent for agent in self.schedule if agent.agent_type == "student"]
-
-        # Don't proceed if no students
+        student_agents = [
+            agent for agent in self.schedule
+            if agent.agent_type == "student" and not agent.is_shooter
+        ]
         if not student_agents:
             return
-
-        # Select a random student to become the shooter
         random_student = random.choice(student_agents)
-
-        # Transform into a shooter
         random_student.is_shooter = True
         random_student.has_weapon = True
-        self.has_active_shooter = True
-
-        # Log the event
-        print(
-            f"ALERT: Student {random_student.unique_id} has become an active shooter at time {self.simulation_time:.1f}s")
+        self.active_shooters.add(random_student)
+        print(f"ALERT: Student {random_student.unique_id} has become an active shooter "
+              f"at time {self.simulation_time:.1f}s")
 
     def add_manual_shooter(self):
-        """Manually convert a random student into a shooter"""
-        # Only add a shooter if there isn't one already
-        if self.has_active_shooter:
-            print("There is already an active shooter in the simulation.")
-            return False
-
-        # Find all student agents
-        student_agents = [agent for agent in self.schedule if agent.agent_type == "student"]
-
-        # Don't proceed if no students
+        """Manually convert a random student into a shooter."""
+        student_agents = [
+            agent for agent in self.schedule
+            if agent.agent_type == "student" and not agent.is_shooter
+        ]
         if not student_agents:
-            print("No students available to become a shooter.")
+            print("No eligible students available to become a shooter.")
             return False
-
-        # Select a random student to become the shooter
         random_student = random.choice(student_agents)
-
-        # Transform into a shooter
         random_student.is_shooter = True
         random_student.has_weapon = True
-        self.has_active_shooter = True
-
-        # Log the event
-        print(
-            f"MANUAL ALERT: Student {random_student.unique_id} has become an active shooter at time {self.simulation_time:.1f}s")
+        self.active_shooters.add(random_student)
+        print(f"MANUAL ALERT: Student {random_student.unique_id} has become an active shooter "
+              f"at time {self.simulation_time:.1f}s")
         return True
+
+    def remove_agent(self, agent):
+        """Remove an agent from the simulation."""
+        if agent in self.schedule:  # Check if the agent is in the simulation
+            if agent in self.active_shooters:  # If it’s a shooter, remove it from the set
+                self.active_shooters.remove(agent)
+                print(f"Shooter {agent.unique_id} has been removed from the simulation.")
+            self.spatial_grid.remove_agent(agent)  # Remove from spatial grid
+            self.schedule.remove(agent)  # Remove from scheduler
+
+    @property
+    def has_active_shooter(self):
+        """Check if there is at least one active shooter."""
+        return len(self.active_shooters) > 0
 
     def add_students(self, count):
         """Add a specified number of students to the simulation."""
@@ -446,14 +432,10 @@ class SchoolModel:
     def remove_agent(self, agent):
         """Remove an agent from the simulation."""
         if agent in self.schedule:
-            # Check if the agent was a shooter
-            if hasattr(agent, 'is_shooter') and agent.is_shooter:
-                self.has_active_shooter = False
-                print(f"Shooter {agent.unique_id} has been removed from the simulation.")
-
-            # Remove from spatial grid first
+            if agent in self.active_shooters:
+                self.active_shooters.remove(agent)
+                print(f"Shooter {agent.unique_id} has been removed. Active shooters left: {len(self.active_shooters)}")
             self.spatial_grid.remove_agent(agent)
-            # Then remove from schedule
             self.schedule.remove(agent)
 
 
