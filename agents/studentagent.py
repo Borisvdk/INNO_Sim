@@ -76,14 +76,15 @@ class StudentAgent(SchoolAgent):
                     other_rect = pygame.Rect(other.position[0] - 5, other.position[1] - 5, 10, 10)
                     if student_rect.colliderect(other_rect):
                         self.position = (
-                            self.position[0] + random.uniform(-0.5, 0.5),
-                            self.position[1] + random.uniform(-0.5, 0.5)
+                            self.position[0] + random.uniform(-0.25, 0.25),
+                            self.position[1] + random.uniform(-0.25, 0.25)
                         )
 
-            return  # Prevent shooter logic from running
 
-        # If the agent is a shooter, follow the shooter logic
-        super().step_continuous(dt)
+            # If the agent is a shooter, follow the shooter logic
+            super().step_continuous(dt)
+
+            return  # Prevent shooter logic from running
 
         # Shooter-specific behavior with line of sight
         current_time = self.model.simulation_time
