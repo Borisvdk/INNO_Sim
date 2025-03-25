@@ -78,7 +78,7 @@ class StudentAgent(SchoolAgent):
                 self.shooter_start_time = current_time
 
             # If 10 seconds have passed since the shooter became active, remove the shooter
-            if current_time - self.shooter_start_time >= 10.0:
+            if current_time - self.shooter_start_time >= 60.0:
                 print(f"Shooter {self.unique_id} removed from simulation after 10 seconds.")
                 self.model.remove_agent(self)
                 return  # End the step to remove the shooter immediately

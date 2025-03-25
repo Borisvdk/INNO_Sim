@@ -245,6 +245,9 @@ class SchoolModel:
             self.last_shooter_check_time = self.simulation_time
             self._check_for_shooter_emergence()
 
+        if self.has_active_shooter:
+            self.run_to_exit()
+
         # Activate all agents in random order with delta time
         random.shuffle(self.schedule)
         for agent in self.schedule:
@@ -454,32 +457,29 @@ class SchoolModel:
 
 
     def run_to_exit(self):
-        """Makes all student agents find the shortest path to the single school exit."""
+        """Gradually makes students start fleeing, one per tick, to avoid lag."""
         
-        # Define the single exit as a rectangle
-        school_exit = pygame.Rect(500, 20, 80, 2)  # (x, y, width, height)
+        # Define the school exit
+        school_exit = pygame.Rect(500, 18, 80, 6)  # Slightly larger for better detection
 
         # Convert walls to pygame.Rect objects for collision detection
         wall_rects = [pygame.Rect(x1, y1, x2 - x1, y2 - y1) for (x1, y1, x2, y2) in self.walls]
 
-        print("\n[DEBUG] Running evacuation process...")
+        # Find students who haven't started fleeing yet
+        non_fleeing_students = [s for s in self.schedule if s.agent_type == "student" and not s.in_emergency]
 
-        for student in self.schedule:
-            if student.agent_type == 'student':
-                print(f"Student at {student.position} attempting to find a path.")
+        # If there are students left to start fleeing, pick one at random
+        if non_fleeing_students:
+            student = random.choice(non_fleeing_students)
+            print(f"🚨 Student at {student.position} is now evacuating.")
 
-                # Check that the student is not inside a wall
-                student_rect = pygame.Rect(student.position[0] - 5, student.position[1] - 5, 10, 10)
-                if any(student_rect.colliderect(wall) for wall in wall_rects):
-                    print(f"ERROR: Student at {student.position} is inside a wall!")
-                    continue  # Skip pathfinding for this student
+            # Find the path to the single exit
+            exit_point = (540, 20)  # Center of the exit
+            path = astar((student.position[0], student.position[1]), exit_point, wall_rects)
 
-                # Find path to the **single exit**
-                exit_point = (540, 20)  # Center of the exit
-                path = astar((student.position[0], student.position[1]), exit_point, wall_rects)
+            if path:
+                student.path = path
+                student.in_emergency = True  # Mark student as actively fleeing
+            else:
+                print(f"⚠ No path found for student at {student.position}")
 
-                if path:
-                    student.path = path
-                    print(f"Path found! Student at {student.position} moving to exit.")
-                else:
-                    print(f"⚠ No path found for student at {student.position}")

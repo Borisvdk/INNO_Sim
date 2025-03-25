@@ -223,14 +223,8 @@ class SchoolAgent:
         new_x = self.position[0] + new_vx * dt
         new_y = self.position[1] + new_vy * dt
 
-        # Handle boundary conditions
-        if self.agent_type == "student":
-            if new_x < 0 or new_x > self.model.width or new_y < 0 or new_y > self.model.height:
-                self.model.remove_agent(self)
-                return
-        else:
-            new_x = max(self.radius, min(new_x, self.model.width - self.radius))
-            new_y = max(self.radius, min(new_y, self.model.height - self.radius))
+        new_x = max(self.radius, min(new_x, self.model.width - self.radius))
+        new_y = max(self.radius, min(new_y, self.model.height - self.radius))
 
         # Check for wall collisions - this is a critical addition
         if self.would_collide_with_wall((new_x, new_y)):

@@ -86,9 +86,6 @@ def run_pygame_simulation():
                 elif event.key == pygame.K_b:
                     show_safe_areas = not show_safe_areas
                     print(f"Safe areas visualization: {'ON' if show_safe_areas else 'OFF'}")
-                elif event.key == pygame.K_e:
-                    model.run_to_exit()
-                    print("Emergency evacuation activated!")
                 elif event.key == pygame.K_x:  # New key for manually adding a shooter
                     success = model.add_manual_shooter()
                     if success:
