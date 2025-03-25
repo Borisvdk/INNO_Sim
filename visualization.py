@@ -1,12 +1,14 @@
 import pygame
 import math
+import time
 from utilities import has_line_of_sight, cast_ray, distance_squared
+import config
 
 
 class Visualizer:
     """Class to handle all visualization aspects of the simulation."""
 
-    def __init__(self, model, screen_width=1200, screen_height=800):
+    def __init__(self, model, screen_width=config.SCREEN_WIDTH, screen_height=config.SCREEN_HEIGHT):
         self.model = model
         self.screen_width = screen_width
         self.screen_height = screen_height
@@ -16,16 +18,8 @@ class Visualizer:
         self.screen = pygame.display.set_mode((screen_width, screen_height))
         pygame.display.set_caption("School Safety Simulation")
 
-        # Pre-define colors for reuse
-        self.COLORS = {
-            "WHITE": (255, 255, 255),
-            "BLUE": (0, 0, 255),
-            "RED": (255, 0, 0),
-            "BLACK": (0, 0, 0),
-            "GREEN": (0, 255, 0),
-            "ARMED_STUDENT": (100, 100, 255),
-            "ARMED_ADULT": (255, 100, 100)
-        }
+        # Use colors from config
+        self.COLORS = config.COLORS
 
         # Create a cached background with walls
         self.background = pygame.Surface((screen_width, screen_height))
@@ -47,10 +41,11 @@ class Visualizer:
 
         # Create font for UI text
         self.font = pygame.font.SysFont(None, 24)
+        self.alert_font = pygame.font.SysFont(None, 36)
 
-        # Pre-render static UI text
+        # Pre-render help text, now including the X key for manual shooter
         self.help_text = self.font.render(
-            "↑/↓: Speed up/down | Space: Reset speed | S: Add students | A: Add adults",
+            "↑/↓: Speed up/down | Space: Reset speed | S: Add students | A: Add adults | E: Emergency evacuation | X: Add shooter",
             True, self.COLORS["BLACK"]
         )
 
@@ -59,6 +54,28 @@ class Visualizer:
             "V: Toggle Line of Sight | B: Toggle Safe Areas",
             True, self.COLORS["BLACK"]
         )
+
+        # Alert system variables
+        self.show_alert = False
+        self.alert_message = ""
+        self.alert_start_time = 0
+        self.alert_duration = config.ALERT_DURATION  # seconds
+        self.last_has_shooter = False
+
+    def check_shooter_status(self):
+        """Check if shooter status has changed and show alert if needed"""
+        # Check if we now have a shooter but didn't before
+        if self.model.has_active_shooter and not self.last_has_shooter:
+            self.show_shooter_alert()
+
+        # Update last shooter status
+        self.last_has_shooter = self.model.has_active_shooter
+
+    def show_shooter_alert(self):
+        """Display an active shooter alert"""
+        self.show_alert = True
+        self.alert_message = "⚠️ ACTIVE SHOOTER ALERT ⚠️"
+        self.alert_start_time = time.time()
 
     def visualize_line_of_sight(self, shooter_agent=None):
         """Visualize the line of sight for the shooter agent."""
@@ -80,10 +97,44 @@ class Visualizer:
         # Create a semi-transparent surface for lines
         temp_surface = pygame.Surface((self.screen.get_width(), self.screen.get_height()), pygame.SRCALPHA)
 
+        # Draw a larger circle for the shooter
+        pygame.draw.circle(
+            temp_surface,
+            (255, 0, 0, 180),  # Semi-transparent red
+            (screen_shooter_x, screen_shooter_y),
+            int(12 * self.scale_factor)
+        )
+
+        # Check if the shooter has a locked target
+        if hasattr(shooter_agent, 'locked_target') and shooter_agent.locked_target is not None:
+            target = shooter_agent.locked_target
+            target_x, target_y = target.position
+            screen_target_x = int(target_x * self.scale_factor)
+            screen_target_y = int(target_y * self.scale_factor)
+
+            # Draw a line to the target
+            pygame.draw.line(
+                temp_surface,
+                (255, 0, 0, 220),  # More opaque red for locked target
+                (screen_shooter_x, screen_shooter_y),
+                (screen_target_x, screen_target_y),
+                3  # Thicker line for locked target
+            )
+
+            # Draw a target circle
+            pygame.draw.circle(
+                temp_surface,
+                (255, 0, 0, 180),
+                (screen_target_x, screen_target_y),
+                int(8 * self.scale_factor),
+                2  # Outline only
+            )
+
         # Visualize line of sight to all other agents
         for agent in self.model.schedule:
-            if agent == shooter_agent:
-                continue
+            if agent == shooter_agent or (
+                    hasattr(shooter_agent, 'locked_target') and agent == shooter_agent.locked_target):
+                continue  # Skip shooter and locked target (already visualized)
 
             # Get agent position
             agent_x, agent_y = agent.position
@@ -116,7 +167,8 @@ class Visualizer:
         # Blit the temporary surface to the screen
         self.screen.blit(temp_surface, (0, 0))
 
-    def visualize_vision_cone(self, shooter_agent=None, vision_angle=120, max_vision_distance=150):
+    def visualize_vision_cone(self, shooter_agent=None, vision_angle=config.VISION_CONE_ANGLE,
+                              max_vision_distance=config.MAX_VISION_DISTANCE):
         """Visualize the vision cone for the shooter agent, properly blocked by walls."""
         # Find a shooter if none provided
         if shooter_agent is None:
@@ -140,7 +192,11 @@ class Visualizer:
         facing_angle = 0  # Default direction
 
         # First, check if the shooter is currently targeting someone
-        current_target = self.find_shooter_target(shooter_agent)
+        current_target = None
+        if hasattr(shooter_agent, 'locked_target') and shooter_agent.locked_target is not None:
+            current_target = shooter_agent.locked_target
+        else:
+            current_target = self.find_shooter_target(shooter_agent)
 
         if current_target:
             # Calculate direction toward target
@@ -224,6 +280,10 @@ class Visualizer:
 
     def find_shooter_target(self, shooter_agent):
         """Find the current target of the shooter based on proximity and line of sight."""
+        # If the shooter has a locked target attribute, use that
+        if hasattr(shooter_agent, 'locked_target') and shooter_agent.locked_target is not None:
+            return shooter_agent.locked_target
+
         # If the shooter is not moving (velocity near zero), it might be aiming
         if hasattr(shooter_agent, 'velocity'):
             vx, vy = shooter_agent.velocity
@@ -278,10 +338,66 @@ class Visualizer:
         # Draw the surface
         self.screen.blit(temp_surface, (0, 0))
 
+    def draw_alert(self):
+        """Draw an alert message on the screen"""
+        if not self.show_alert:
+            return
+
+        # Check if alert should still be shown
+        current_time = time.time()
+        if current_time - self.alert_start_time > self.alert_duration:
+            self.show_alert = False
+            return
+
+        # Calculate alert box size and position
+        text_surface = self.alert_font.render(self.alert_message, True, self.COLORS["WHITE"])
+        text_rect = text_surface.get_rect()
+
+        alert_width = text_rect.width + 40
+        alert_height = text_rect.height + 20
+        alert_x = (self.screen_width - alert_width) // 2
+        alert_y = 100
+
+        # Create alert surface with transparency
+        alert_surface = pygame.Surface((alert_width, alert_height), pygame.SRCALPHA)
+
+        # Calculate pulsing effect - alpha varies between 180 and 255
+        elapsed = current_time - self.alert_start_time
+        pulse_factor = 0.5 + 0.5 * math.sin(elapsed * 10)  # Pulsing frequency
+        alpha = int(180 + 75 * pulse_factor)
+
+        # Draw alert background with pulsing effect
+        pygame.draw.rect(
+            alert_surface,
+            (255, 0, 0, alpha),  # Red with pulsing alpha
+            pygame.Rect(0, 0, alert_width, alert_height),
+            border_radius=10
+        )
+
+        # Draw text
+        text_x = (alert_width - text_rect.width) // 2
+        text_y = (alert_height - text_rect.height) // 2
+        alert_surface.blit(text_surface, (text_x, text_y))
+
+        # Draw border
+        pygame.draw.rect(
+            alert_surface,
+            (255, 255, 255, 255),  # White border
+            pygame.Rect(0, 0, alert_width, alert_height),
+            width=2,
+            border_radius=10
+        )
+
+        # Draw the alert
+        self.screen.blit(alert_surface, (alert_x, alert_y))
+
     def render_frame(self, simulation_time, sim_speed, fps=0, show_line_of_sight=False, show_safe_areas=False):
         """Render a complete frame of the simulation."""
         # Draw background (with walls)
         self.screen.blit(self.background, (0, 0))
+
+        # Check for shooter status changes
+        self.check_shooter_status()
 
         # Visualize safe areas if enabled
         if show_safe_areas:
@@ -337,7 +453,7 @@ class Visualizer:
             self.visualize_vision_cone()
 
         # Process and draw active shots efficiently
-        shot_duration = 0.5
+        shot_duration = config.SHOT_VISUALIZATION_DURATION
         shots_to_remove = []
         current_sim_time = self.model.simulation_time
 
@@ -360,12 +476,17 @@ class Visualizer:
         # Count agents for display
         student_count = sum(1 for agent in self.model.schedule if agent.agent_type == "student")
         adult_count = sum(1 for agent in self.model.schedule if agent.agent_type == "adult")
+        shooter_count = sum(1 for agent in self.model.schedule if hasattr(agent, "is_shooter") and agent.is_shooter)
 
         # Render dynamic UI text
         time_text = self.font.render(f"Sim Time: {simulation_time:.1f}s", True, self.COLORS["BLACK"])
         speed_text = self.font.render(f"Speed: {sim_speed:.1f}x", True, self.COLORS["BLACK"])
         count_text = self.font.render(f"Students: {student_count}, Adults: {adult_count}", True, self.COLORS["BLACK"])
         fps_text = self.font.render(f"FPS: {fps:.1f}", True, self.COLORS["BLACK"])
+
+        # Show shooter count
+        shooter_text_color = self.COLORS["ALERT"] if shooter_count > 0 else self.COLORS["BLACK"]
+        shooter_text = self.font.render(f"Active Shooters: {shooter_count}", True, shooter_text_color)
 
         # Visualization status text
         los_status = "ON" if show_line_of_sight else "OFF"
@@ -379,10 +500,14 @@ class Visualizer:
         self.screen.blit(time_text, (10, 10))
         self.screen.blit(speed_text, (10, 40))
         self.screen.blit(count_text, (10, 70))
-        self.screen.blit(fps_text, (10, 100))
-        self.screen.blit(viz_status_text, (10, 130))
+        self.screen.blit(shooter_text, (10, 100))
+        self.screen.blit(fps_text, (10, 130))
+        self.screen.blit(viz_status_text, (10, 160))
         self.screen.blit(self.help_text, (10, self.screen_height - 50))
         self.screen.blit(self.viz_help_text, (10, self.screen_height - 25))
+
+        # Draw alert if active
+        self.draw_alert()
 
         # Update display
         pygame.display.flip()
