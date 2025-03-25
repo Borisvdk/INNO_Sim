@@ -107,11 +107,12 @@ class SpatialGrid:
 class SchoolModel:
     """Main model class for the school simulation."""
 
-    def __init__(self, n_students=50, n_adults=10, width=100, height=100):
+    def __init__(self, n_students=50, n_adults=10, width=100, height=100, adult_weapon_percentage=0.9):
         self.num_students = n_students
         self.num_adults = n_adults
         self.width = width
         self.height = height
+        self.adult_weapon_percentage = adult_weapon_percentage  # Nieuw: percentage volwassenen met een wapen
         self.running = True
         self.schedule = []  # List of all agents
         self.active_shots = []  # List to store active shots
@@ -180,6 +181,11 @@ class SchoolModel:
         for i in range(self.num_adults):
             position = all_positions[i + self.num_students]
             agent = AgentFactory.create_agent("adult", i + self.num_students, self, position)
+            # Controleer of deze volwassen agent een wapen krijgt:
+            if random.random() < self.adult_weapon_percentage:
+                agent.has_weapon = True
+                agent.color = (255, 255, 0)  # Gele kleur
+            # Indien geen wapen, blijft de agent zijn standaardkleur behouden
             self.schedule.append(agent)
             self.spatial_grid.update_agent(agent)
 
