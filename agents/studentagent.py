@@ -23,6 +23,7 @@ class StudentAgent(SchoolAgent):
         self.path = []
         self.reached_exit = False
         self.in_emergency = False
+        self.normal_speed = random.uniform(40.0, 60.0)  # Speed for normal movement
 
         # Shooter-specific attributes
         self.is_shooter = False
@@ -32,11 +33,11 @@ class StudentAgent(SchoolAgent):
         self.hit_probability = 0.5  # 50% chance to hit
         self.locked_target = None  # Added target locking attribute
         self.target_lock_time = 0.0  # Time when target was locked
-        self.max_target_lost_time = 2.0  # IMPROVED: Reduced from 5.0 to make shooter switch targets faster when losing sight
-        self.max_target_pursuit_time = 10.0  # NEW: Maximum time to pursue any single target before switching
+        self.max_target_lost_time = 2.0  # Maximum time to keep pursuing a target after losing sight (seconds)
+        self.max_target_pursuit_time = 10.0  # Maximum time to pursue any single target before switching
         self.target_last_seen_time = 0.0  # Time when target was last seen
-        self.target_lock_distance = 75.0  # IMPROVED: Reduced from 150.0 to focus on closer targets
-        self.target_release_distance = 100.0  # IMPROVED: Reduced from 200.0 to release distant targets sooner
+        self.target_lock_distance = 75.0  # Maximum distance to initially lock a target (units)
+        self.target_release_distance = 100.0  # Distance at which to release a locked target (units)
 
         # Wall avoidance parameters
         self.wall_stuck_time = 0.0  # Time when agent started being stuck at a wall
@@ -52,48 +53,53 @@ class StudentAgent(SchoolAgent):
         return self.position[0] <= 0 or self.position[0] >= WIDTH or self.position[1] <= 0 or self.position[1] >= HEIGHT
 
     def step_continuous(self, dt):
-        """Moves students at normal speed toward the exit and removes them if they reach it."""
-
+        """
+        Handles student agent movement. Students will:
+        1. Follow evacuation path during emergencies
+        2. Roam around randomly during normal operation
+        3. Execute shooter behavior if they are a shooter
+        """
         # Define the exit area
-        school_exit = pygame.Rect(500, 18, 80, 6)  # Slightly larger for better detection
-
-        # Ensure students use their normal speed
-        normal_speed = getattr(self, 'normal_speed', 1.0)  # Use default speed if not set
+        school_exit = pygame.Rect(500, 18, 80, 6)
 
         if not self.is_shooter:
+            # EVACUATION MODE - follow path to exit if one exists
             if self.path:
                 target_x, target_y = self.path[0]
                 dx, dy = target_x - self.position[0], target_y - self.position[1]
                 dist = math.hypot(dx, dy)
 
-                if dist < normal_speed:  # Move at normal speed
+                # Use normal_speed for movement
+                if dist < self.normal_speed * dt:  # If close enough to reach in this step
                     self.position = (target_x, target_y)
                     self.path.pop(0)
                 else:
+                    # Move toward next waypoint
                     self.position = (
-                        self.position[0] + (dx / dist) * normal_speed,
-                        self.position[1] + (dy / dist) * normal_speed
+                        self.position[0] + (dx / dist) * self.normal_speed * dt,
+                        self.position[1] + (dy / dist) * self.normal_speed * dt
                     )
 
-            # Check if student is inside the exit area
-            student_rect = pygame.Rect(self.position[0] - 5, self.position[1] - 5, 10, 10)
-            if student_rect.colliderect(school_exit):
-                print(f"✅ Student at {self.position} exited safely!")
-                self.model.remove_agent(self)
-                return
+                # Check if student reached exit
+                student_rect = pygame.Rect(self.position[0] - 5, self.position[1] - 5, 10, 10)
+                if student_rect.colliderect(school_exit):
+                    print(f"✅ Student at {self.position} exited safely!")
+                    self.model.remove_agent(self)
+                    return
 
-            # Prevent students from getting stuck by nudging them apart slightly
-            for other in self.model.schedule:
-                if other != self and other.agent_type == "student":
-                    other_rect = pygame.Rect(other.position[0] - 5, other.position[1] - 5, 10, 10)
-                    if student_rect.colliderect(other_rect):
-                        self.position = (
-                            self.position[0] + random.uniform(-0.5, 0.5),
-                            self.position[1] + random.uniform(-0.5, 0.5)
-                        )
+                # Avoid collisions with other students
+                self._avoid_student_collisions()
+            else:
+                # NORMAL MODE - roam around when no emergency path is set
+                # Use the parent class's continuous movement logic
+                super().move_continuous(dt)
 
-            return  # Prevent shooter logic from running
+                # Additional collision avoidance with other students
+                self._avoid_student_collisions()
 
+            return  # Prevent shooter logic from running if not a shooter
+
+        # SHOOTER LOGIC (unchanged from your improved version)
         # If the agent is a shooter, follow the shooter logic
         super().step_continuous(dt)
 
@@ -199,6 +205,21 @@ class StudentAgent(SchoolAgent):
         # Update spatial grid if position changed
         if old_position != self.position:
             self.model.spatial_grid.update_agent(self)
+
+    def _avoid_student_collisions(self):
+        """Helper method to prevent students from overlapping."""
+        student_rect = pygame.Rect(self.position[0] - 5, self.position[1] - 5, 10, 10)
+
+        for other in self.model.schedule:
+            if other != self and other.agent_type == "student":
+                other_rect = pygame.Rect(other.position[0] - 5, other.position[1] - 5, 10, 10)
+                if student_rect.colliderect(other_rect):
+                    # Apply a stronger nudge to separate overlapping students
+                    self.position = (
+                        self.position[0] + random.uniform(-1.0, 1.0),
+                        self.position[1] + random.uniform(-1.0, 1.0)
+                    )
+                    break  # Only apply one nudge per update to avoid jitter
 
     def _validate_locked_target(self, current_time):
         """Validate if current locked target is still valid."""
