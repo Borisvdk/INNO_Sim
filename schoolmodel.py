@@ -110,7 +110,7 @@ class SchoolModel:
     """Main model class for the school simulation."""
 
     def __init__(self, n_students=config.INITIAL_STUDENTS, n_adults=config.INITIAL_ADULTS,
-                 width=config.SIM_WIDTH, height=config.SIM_HEIGHT, adult_weapon_percentage=0.9):
+                 width=config.SIM_WIDTH, height=config.SIM_HEIGHT, adult_weapon_percentage=config.ADULT_WEAPEN_PROBABILITY):
         self.num_students = n_students
         self.num_adults = n_adults
         self.width = width
