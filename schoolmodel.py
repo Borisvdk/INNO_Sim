@@ -3,8 +3,10 @@ import random
 
 import pygame
 from dijkstra_test import astar
+import config
 
-HEIGHT, WIDTH = 1200, 800
+HEIGHT, WIDTH = config.SCREEN_HEIGHT, config.SCREEN_WIDTH
+
 
 class AgentFactory:
     """Factory class for creating different types of agents."""
@@ -107,7 +109,8 @@ class SpatialGrid:
 class SchoolModel:
     """Main model class for the school simulation."""
 
-    def __init__(self, n_students=50, n_adults=10, width=100, height=100, adult_weapon_percentage=0.9):
+    def __init__(self, n_students=config.INITIAL_STUDENTS, n_adults=config.INITIAL_ADULTS,
+                 width=config.SIM_WIDTH, height=config.SIM_HEIGHT, adult_weapon_percentage=0.9):
         self.num_students = n_students
         self.num_adults = n_adults
         self.width = width
@@ -117,6 +120,12 @@ class SchoolModel:
         self.schedule = []  # List of all agents
         self.active_shots = []  # List to store active shots
         self.simulation_time = 0.0  # Total simulated time
+        self.has_active_shooter = False  # Tracks if there's currently an active shooter
+
+        # Parameters for random shooter emergence (from config)
+        self.shooter_check_interval = config.SHOOTER_CHECK_INTERVAL
+        self.last_shooter_check_time = 0.0
+        self.shooter_emergence_probability = config.SHOOTER_EMERGENCE_PROBABILITY
 
         # Initialize spatial grid
         self.spatial_grid = SpatialGrid(width, height, cell_size=10)
@@ -138,7 +147,7 @@ class SchoolModel:
         self._create_all_agents()
 
     def _create_all_agents(self):
-        """Create all agents at safe positions"""
+        """Create all agents at safe positions - no shooter at the beginning"""
         # Generate safe positions for all agents ahead of time
         all_positions = []
         min_distance_between_agents = 8.0  # Ensure agents aren't too close to each other
@@ -166,14 +175,10 @@ class SchoolModel:
                 print("Warning: Could not find position far enough from other agents")
                 all_positions.append(position)  # Use the last attempt
 
-        # Choose shooter index
-        shooter_index = random.randint(0, self.num_students - 1) if self.num_students > 0 else -1
-
-        # Create student agents with safe positions
+        # Create student agents with safe positions - no shooter initially
         for i in range(self.num_students):
             position = all_positions[i]
-            is_shooter = (i == shooter_index)
-            agent = AgentFactory.create_agent("student", i, self, position, is_shooter)
+            agent = AgentFactory.create_agent("student", i, self, position, is_shooter=False)
             self.schedule.append(agent)
             self.spatial_grid.update_agent(agent)
 
@@ -215,10 +220,68 @@ class SchoolModel:
         # Update the total simulation time
         self.simulation_time += dt
 
+        # Check for random shooter emergence
+        if not self.has_active_shooter and self.simulation_time - self.last_shooter_check_time >= self.shooter_check_interval:
+            self.last_shooter_check_time = self.simulation_time
+            self._check_for_shooter_emergence()
+
         # Activate all agents in random order with delta time
         random.shuffle(self.schedule)
         for agent in self.schedule:
             agent.step_continuous(dt)
+
+    def _check_for_shooter_emergence(self):
+        """Check if a random student becomes a shooter"""
+        # Only proceed with a small probability
+        if random.random() > self.shooter_emergence_probability:
+            return
+
+        # Find all student agents
+        student_agents = [agent for agent in self.schedule if agent.agent_type == "student"]
+
+        # Don't proceed if no students
+        if not student_agents:
+            return
+
+        # Select a random student to become the shooter
+        random_student = random.choice(student_agents)
+
+        # Transform into a shooter
+        random_student.is_shooter = True
+        random_student.has_weapon = True
+        self.has_active_shooter = True
+
+        # Log the event
+        print(
+            f"ALERT: Student {random_student.unique_id} has become an active shooter at time {self.simulation_time:.1f}s")
+
+    def add_manual_shooter(self):
+        """Manually convert a random student into a shooter"""
+        # Only add a shooter if there isn't one already
+        if self.has_active_shooter:
+            print("There is already an active shooter in the simulation.")
+            return False
+
+        # Find all student agents
+        student_agents = [agent for agent in self.schedule if agent.agent_type == "student"]
+
+        # Don't proceed if no students
+        if not student_agents:
+            print("No students available to become a shooter.")
+            return False
+
+        # Select a random student to become the shooter
+        random_student = random.choice(student_agents)
+
+        # Transform into a shooter
+        random_student.is_shooter = True
+        random_student.has_weapon = True
+        self.has_active_shooter = True
+
+        # Log the event
+        print(
+            f"MANUAL ALERT: Student {random_student.unique_id} has become an active shooter at time {self.simulation_time:.1f}s")
+        return True
 
     def add_students(self, count):
         """Add a specified number of students to the simulation."""
@@ -359,24 +422,44 @@ class SchoolModel:
     def remove_agent(self, agent):
         """Remove an agent from the simulation."""
         if agent in self.schedule:
+            # Check if the agent was a shooter
+            if hasattr(agent, 'is_shooter') and agent.is_shooter:
+                self.has_active_shooter = False
+                print(f"Shooter {agent.unique_id} has been removed from the simulation.")
+
             # Remove from spatial grid first
             self.spatial_grid.remove_agent(agent)
             # Then remove from schedule
             self.schedule.remove(agent)
 
+
     def run_to_exit(self):
+        """Makes all student agents find the shortest path to the single school exit."""
+        
+        # Define the single exit as a rectangle
+        school_exit = pygame.Rect(500, 20, 80, 2)  # (x, y, width, height)
+
+        # Convert walls to pygame.Rect objects for collision detection
+        wall_rects = [pygame.Rect(x1, y1, x2 - x1, y2 - y1) for (x1, y1, x2, y2) in self.walls]
+
+        print("\n[DEBUG] Running evacuation process...")
+
         for student in self.schedule:
-            student.in_emergency = True
             if student.agent_type == 'student':
-                exits = [
-                    (student.position[0], 0),              # Top edge
-                    (student.position[0], HEIGHT),         # Bottom edge
-                    (0, student.position[1]),              # Left edge
-                    (WIDTH, student.position[1])          # Right edge
-                ]
-                closest_exit = min(exits, key=lambda ex: math.hypot(student.position[0] - ex[0], student.position[1] - ex[1]))
-                path = astar((student.position[0], student.position[1]), closest_exit, self.walls)
+                print(f"Student at {student.position} attempting to find a path.")
+
+                # Check that the student is not inside a wall
+                student_rect = pygame.Rect(student.position[0] - 5, student.position[1] - 5, 10, 10)
+                if any(student_rect.colliderect(wall) for wall in wall_rects):
+                    print(f"ERROR: Student at {student.position} is inside a wall!")
+                    continue  # Skip pathfinding for this student
+
+                # Find path to the **single exit**
+                exit_point = (540, 20)  # Center of the exit
+                path = astar((student.position[0], student.position[1]), exit_point, wall_rects)
+
                 if path:
                     student.path = path
+                    print(f"Path found! Student at {student.position} moving to exit.")
                 else:
-                    print(f"No path found for student at ({student.position[0]}, {student.position[1]})")
+                    print(f"⚠ No path found for student at {student.position}")

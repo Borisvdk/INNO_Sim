@@ -1,5 +1,7 @@
 import math
 import random
+
+import pygame
 from agents.schoolagent import SchoolAgent
 from utilities import has_line_of_sight
 
@@ -28,6 +30,7 @@ class StudentAgent(SchoolAgent):
         self.shooting_interval = 2.0  # Shoot every 2 seconds
         self.shooting_range = 10.0  # Stop and shoot within 10 units
         self.hit_probability = 0.5  # 50% chance to hit
+        self.locked_target = None  # Added target locking attribute
 
         # Search behavior tracking
         self.search_start_time = 0
@@ -37,21 +40,50 @@ class StudentAgent(SchoolAgent):
         return self.position[0] <= 0 or self.position[0] >= WIDTH or self.position[1] <= 0 or self.position[1] >= HEIGHT
 
     def step_continuous(self, dt):
-        """Override step_continuous with shooter behavior and wall awareness"""
+        """Moves students at normal speed toward the exit and removes them if they reach it."""
+        
+        # Define the exit area
+        school_exit = pygame.Rect(500, 18, 80, 6)  # Slightly larger for better detection
+
+        # Ensure students use their normal speed
+        normal_speed = getattr(self, 'normal_speed', 1.0)  # Use default speed if not set
+
         if not self.is_shooter:
             if self.path:
                 target_x, target_y = self.path[0]
                 dx, dy = target_x - self.position[0], target_y - self.position[1]
                 dist = math.hypot(dx, dy)
-                
-                if dist < self.max_speed:
+
+                if dist < normal_speed:  # Move at normal speed
                     self.position = (target_x, target_y)
                     self.path.pop(0)
                 else:
-                    self.position = (self.position[0] + self.max_speed * dx / dist, self.position[1] + self.max_speed * dy / dist)
-            # Use standard movement for non-shooters
-            super().step_continuous(dt)
-            return
+                    self.position = (
+                        self.position[0] + (dx / dist) * normal_speed,
+                        self.position[1] + (dy / dist) * normal_speed
+                    )
+
+            # Check if student is inside the exit area
+            student_rect = pygame.Rect(self.position[0] - 5, self.position[1] - 5, 10, 10)
+            if student_rect.colliderect(school_exit):
+                print(f"✅ Student at {self.position} exited safely!")
+                self.model.remove_agent(self)
+                return
+
+            # Prevent students from getting stuck by nudging them apart slightly
+            for other in self.model.schedule:
+                if other != self and other.agent_type == "student":
+                    other_rect = pygame.Rect(other.position[0] - 5, other.position[1] - 5, 10, 10)
+                    if student_rect.colliderect(other_rect):
+                        self.position = (
+                            self.position[0] + random.uniform(-0.5, 0.5),
+                            self.position[1] + random.uniform(-0.5, 0.5)
+                        )
+
+            return  # Prevent shooter logic from running
+
+        # If the agent is a shooter, follow the shooter logic
+        super().step_continuous(dt)
 
         # Shooter-specific behavior with line of sight
         current_time = self.model.simulation_time
@@ -67,31 +99,53 @@ class StudentAgent(SchoolAgent):
                 if self.has_line_of_sight(agent.position):
                     visible_targets.append(agent)
 
+        # Check if locked target is still valid
+        target_is_valid = False
+        if self.locked_target is not None:
+            # Check if locked target still exists in model
+            if self.locked_target in self.model.schedule:
+                # Check if locked target is visible
+                if self.has_line_of_sight(self.locked_target.position):
+                    target_is_valid = True
+                else:
+                    print(f"Shooter {self.unique_id} lost sight of target {self.locked_target.unique_id}")
+            else:
+                print(f"Shooter {self.unique_id} lost target {self.locked_target.unique_id}")
+
+        # Reset locked target if not valid
+        if not target_is_valid:
+            self.locked_target = None
+
         if not visible_targets:
             # No visible targets - move randomly to search
             self.search_behavior(dt)
         else:
-            # Find nearest visible target
-            nearest_agent = None
-            min_distance_squared = float('inf')
+            # If no locked target, find nearest visible target
+            if self.locked_target is None:
+                nearest_agent = None
+                min_distance_squared = float('inf')
 
-            for agent in visible_targets:
-                dx = self.position[0] - agent.position[0]
-                dy = self.position[1] - agent.position[1]
-                distance_squared = dx * dx + dy * dy
+                for agent in visible_targets:
+                    dx = self.position[0] - agent.position[0]
+                    dy = self.position[1] - agent.position[1]
+                    distance_squared = dx * dx + dy * dy
 
-                if distance_squared < min_distance_squared:
-                    min_distance_squared = distance_squared
-                    nearest_agent = agent
+                    if distance_squared < min_distance_squared:
+                        min_distance_squared = distance_squared
+                        nearest_agent = agent
 
-            # Calculate actual distance only once
-            distance = math.sqrt(min_distance_squared)
+                # Lock onto the nearest target
+                self.locked_target = nearest_agent
+                print(f"Shooter {self.unique_id} locked onto target {self.locked_target.unique_id}")
+
+            # Calculate distance to locked target
+            target_x, target_y = self.locked_target.position
+            dx = target_x - self.position[0]
+            dy = target_y - self.position[1]
+            distance = math.sqrt(dx * dx + dy * dy)
 
             if distance > self.shooting_range:
-                # Move toward nearest target
-                dx = nearest_agent.position[0] - self.position[0]
-                dy = nearest_agent.position[1] - self.position[1]
-
+                # Move toward locked target
                 # Normalize direction
                 inv_dist = 1.0 / distance
                 direction_x = dx * inv_dist
@@ -105,7 +159,7 @@ class StudentAgent(SchoolAgent):
 
                 # Try to shoot if enough time has passed
                 if current_time - self.last_shot_time >= self.shooting_interval:
-                    self._shoot_at_target(nearest_agent, current_time)
+                    self._shoot_at_target(self.locked_target, current_time)
 
         # Update position with wall collision checks
         new_x = self.position[0] + self.velocity[0] * dt
@@ -168,6 +222,10 @@ class StudentAgent(SchoolAgent):
             except Exception as e:
                 print(f"Warning: Could not play kill sound: {e}")
 
+            # Clear locked target if this was it
+            if self.locked_target == target:
+                self.locked_target = None
+
             # Remove the target from the model
             self.model.remove_agent(target)
         else:
@@ -203,5 +261,3 @@ class StudentAgent(SchoolAgent):
             self.search_start_time = self.model.simulation_time
             # More dramatic direction change after long search
             self.direction = random.uniform(0, 2 * math.pi)
-
-        
