@@ -54,7 +54,7 @@ ADULT_RESPONSE_DELAY_RANGE = (2, 5)  # (min, max) time steps
 
 # Visualization parameters
 VISION_CONE_ANGLE = 120  # Degrees
-MAX_VISION_DISTANCE = 150  # Units
+MAX_VISION_DISTANCE = 150  # Units # Redundant if using AWARENESS_RANGE, keep if needed elsewhere
 SHOT_VISUALIZATION_DURATION = 0.5  # Seconds
 ALERT_DURATION = 5.0  # Seconds
 

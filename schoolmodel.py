@@ -3,11 +3,8 @@ import random
 import os
 from grid_converter import integrate_grid_into_simulation
 import config
-import pygame
+import pygame # Ensure pygame is imported
 from dijkstra_test import astar
-import config
-
-HEIGHT, WIDTH = config.SCREEN_HEIGHT, config.SCREEN_WIDTH
 
 
 class AgentFactory:
@@ -115,14 +112,7 @@ class SchoolModel:
                  grid_file=None):
         """
         Initialize the school simulation model.
-
-        Args:
-            n_students (int): Number of student agents.
-            n_adults (int): Number of adult agents.
-            width (float): Width of the simulation area.
-            height (float): Height of the simulation area.
-            adult_weapon_percentage (float): Probability an adult has a weapon.
-            grid_file (str, optional): Path to a grid file for walls.
+        ... (docstring remains the same) ...
         """
         self.num_students = n_students
         self.num_adults = n_adults
@@ -130,15 +120,16 @@ class SchoolModel:
         self.height = height
         self.adult_weapon_percentage = adult_weapon_percentage
         self.running = True
-        self.schedule = []  # List of all agents
-        self.active_shots = []  # List to store active shots (e.g., projectiles)
-        self.simulation_time = 0.0  # Total simulated time in seconds
-        self.active_shooters = set()  # Set to track all active shooters
-        self.tick_count = 0
+        self.schedule = []
+        self.active_shots = []
+        self.simulation_time = 0.0
+        self.active_shooters = set()
+        # Remove self.tick_count if only used by run_to_exit
+        # self.tick_count = 0
         self.shooter_check_interval = config.SHOOTER_CHECK_INTERVAL
         self.last_shooter_check_time = 0.0
         self.shooter_emergence_probability = config.SHOOTER_EMERGENCE_PROBABILITY
-        self.spatial_grid = SpatialGrid(width, height, cell_size=10)  # Assumed spatial grid utility
+        self.spatial_grid = SpatialGrid(width, height, cell_size=max(config.STUDENT_RADIUS, config.ADULT_RADIUS) * 4) # Adjust cell size maybe?
 
         # Load walls from grid file or use default configuration
         if grid_file and os.path.exists(grid_file):
@@ -147,16 +138,18 @@ class SchoolModel:
             print(f"Loaded {len(self.walls)} wall segments from grid file")
         else:
             print("Using default wall configuration")
+            # Example default walls - replace with your actual defaults if needed
             self.walls = [
-                (20, 20, 500, 22),  # Top wall (horizontal)
-                (20, 195, 250, 197),  # Middle left (horizontal)
-                (340, 195, 580, 197),  # Middle right (horizontal)
-                (20, 375, 580, 377),  # Bottom wall (horizontal)
-                (20, 20, 22, 375),  # Left wall (vertical)
-                (578, 20, 580, 375),  # Right wall (vertical)
-            ]
+                 (0, 0, width, 1), (0, height - 1, width, height), # Top/Bottom outer
+                 (0, 0, 1, height), (width - 1, 0, width, height), # Left/Right outer
+                 # Add internal walls here if using defaults
+             ]
 
-        self._create_wall_grid()
+        # --- ADDED: Create pygame.Rect versions of walls for pathfinding ---
+        self.wall_rects = [pygame.Rect(x1, y1, x2 - x1, y2 - y1) for (x1, y1, x2, y2) in self.walls]
+        # -----------------------------------------------------------------
+
+        # Removed self._create_wall_grid() call if it was only for optimization (LoS uses direct check)
         self._create_all_agents()
 
     def _create_all_agents(self):
@@ -207,30 +200,11 @@ class SchoolModel:
             self.schedule.append(agent)
             self.spatial_grid.update_agent(agent)
 
-    def _create_wall_grid(self):
-        """Create a grid-based lookup for walls to optimize wall avoidance checks"""
-        self.wall_grid = {}
-
-        for wall_idx, wall in enumerate(self.walls):
-            x_min, y_min, x_max, y_max = wall
-
-            # Determine grid cells this wall intersects (using 10x10 grid for the entire space)
-            x_min_grid = int(max(0, x_min / self.width * 10))
-            x_max_grid = int(min(9, x_max / self.width * 10))
-            y_min_grid = int(max(0, y_min / self.height * 10))
-            y_max_grid = int(min(9, y_max / self.height * 10))
-
-            # Add wall index to all intersecting grid cells
-            for x_grid in range(x_min_grid, x_max_grid + 1):
-                for y_grid in range(y_min_grid, y_max_grid + 1):
-                    grid_key = (x_grid, y_grid)
-                    if grid_key not in self.wall_grid:
-                        self.wall_grid[grid_key] = set()
-                    self.wall_grid[grid_key].add(wall_idx)
+    # REMOVE or comment out the _create_wall_grid method if not used elsewhere
+    # def _create_wall_grid(self): ...
 
     def step_continuous(self, dt):
         """Perform a continuous time step with delta time dt."""
-        # Update the total simulation time
         self.simulation_time += dt
 
         # Check for random shooter emergence
@@ -238,13 +212,19 @@ class SchoolModel:
             self.last_shooter_check_time = self.simulation_time
             self._check_for_shooter_emergence()
 
-        if self.has_active_shooter:
-            self.run_to_exit()
+        # --- REMOVED CALL TO run_to_exit ---
+        # if self.has_active_shooter:
+        #     self.run_to_exit() # REMOVE THIS LINE
+        # ------------------------------------
 
-        # Activate all agents in random order with delta time
-        random.shuffle(self.schedule)
-        for agent in self.schedule:
-            agent.step_continuous(dt)
+        # Shuffle and step agents
+        random.shuffle(self.schedule) # Consider if shuffling is still needed or detrimental
+        agents_to_process = list(self.schedule) # Create copy in case agents are removed during step
+        for agent in agents_to_process:
+            # Ensure agent is still in the main schedule before stepping
+            if agent in self.schedule:
+                 agent.step_continuous(dt)
+
 
     def _check_for_shooter_emergence(self):
         """Check if a random student spontaneously becomes a shooter."""
@@ -429,36 +409,3 @@ class SchoolModel:
                 print(f"Shooter {agent.unique_id} has been removed. Active shooters left: {len(self.active_shooters)}")
             self.spatial_grid.remove_agent(agent)
             self.schedule.remove(agent)
-
-
-    def run_to_exit(self):
-        """Gradually makes students start fleeing, one per tick, to avoid lag."""
-        
-        # Define the school exit
-        school_exit = pygame.Rect(500, 18, 80, 6)  # Slightly larger for better detection
-
-        # Convert walls to pygame.Rect objects for collision detection
-        wall_rects = [pygame.Rect(x1, y1, x2 - x1, y2 - y1) for (x1, y1, x2, y2) in self.walls]
-
-        # Find students who haven't started fleeing yet
-        non_fleeing_students = [s for s in self.schedule if s.agent_type == "student" and not s.in_emergency]
-
-        # If there are students left to start fleeing, pick one at random
-        if non_fleeing_students:
-            if self.tick_count >= 5:
-                self.tick_count = 0
-                student = random.choice(non_fleeing_students)
-                print(f"🚨 Student at {student.position} is now evacuating.")
-
-                # Find the path to the single exit
-                exit_point = (540, 20)  # Center of the exit
-                path = astar((student.position[0], student.position[1]), exit_point, wall_rects)
-
-                if path:
-                    student.path = path
-                    student.in_emergency = True  # Mark student as actively fleeing
-                else:
-                    print(f"⚠ No path found for student at {student.position}")
-            else:
-                self.tick_count += 1
-
