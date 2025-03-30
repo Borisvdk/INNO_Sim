@@ -1,10 +1,12 @@
+# --- START OF FILE studentagent.py ---
+
 import math
 import random
 import config
 import pygame
 from agents.schoolagent import SchoolAgent
 from dijkstra_test import astar
-from utilities import has_line_of_sight
+from utilities import has_line_of_sight # Keep this, shooter still uses it
 
 class StudentAgent(SchoolAgent):
     """Agent class for students with potential shooter behaviors."""
@@ -81,35 +83,43 @@ class StudentAgent(SchoolAgent):
             if not self.in_emergency and self.model.has_active_shooter:
                 # Iterate through ALL active shooters in the model
                 for shooter in self.model.active_shooters:
-                    # Check only Line of Sight (infinite distance, blocked by walls)
                     # Ensure shooter is still valid (might have been removed in the same step)
-                    if shooter in self.model.schedule and self.has_line_of_sight(shooter.position):
-                        print(f"Student {self.unique_id} saw shooter {shooter.unique_id}! Entering emergency.")
-                        self.in_emergency = True
+                    if shooter in self.model.schedule:
+                        # ***** CHANGED LOGIC: Check proximity instead of LoS *****
+                        # Calculate squared distance for efficiency
+                        dx = shooter.position[0] - self.position[0]
+                        dy = shooter.position[1] - self.position[1]
+                        dist_squared = dx * dx + dy * dy
 
-                        # --- Calculate path to exit immediately ---
-                        exit_x_start = 50 * (config.SIM_WIDTH / 60)
-                        exit_x_end = 58 * (config.SIM_WIDTH / 60)
-                        exit_y_start = 0
-                        exit_y_end = 2 * (config.SIM_HEIGHT / 40) + 10
-                        exit_center_target = ((exit_x_start + exit_x_end) / 2, exit_y_end / 2)
+                        # Check if within awareness range (using squared distance)
+                        if dist_squared < config.AWARENESS_RANGE ** 2:
+                            print(f"Student {self.unique_id} detected shooter {shooter.unique_id} nearby (dist^2={dist_squared:.1f})! Entering emergency.")
+                            self.in_emergency = True
 
-                        try:
-                            path = astar((self.position[0], self.position[1]),
-                                         exit_center_target,
-                                         self.model.wall_rects) # Use pygame.Rect list
-                            if path:
-                                self.path = path
-                                print(f"Student {self.unique_id} calculated path to exit.")
-                            else:
-                                print(f"⚠️ No path found for student {self.unique_id} at {self.position} after seeing shooter.")
-                                # Optional: Add fallback behavior here
-                        except Exception as e:
-                             print(f"Error during A* pathfinding for student {self.unique_id}: {e}")
-                             # Handle error gracefully
+                            # --- Calculate path to exit immediately ---
+                            exit_x_start = 50 * (config.SIM_WIDTH / 60)
+                            exit_x_end = 58 * (config.SIM_WIDTH / 60)
+                            exit_y_start = 0
+                            exit_y_end = 2 * (config.SIM_HEIGHT / 40) + 10
+                            exit_center_target = ((exit_x_start + exit_x_end) / 2, exit_y_end / 2)
 
-                        # Once awareness is triggered by *any* shooter, stop checking others
-                        break
+                            try:
+                                path = astar((self.position[0], self.position[1]),
+                                             exit_center_target,
+                                             self.model.wall_rects) # Use pygame.Rect list
+                                if path:
+                                    self.path = path
+                                    print(f"Student {self.unique_id} calculated path to exit.")
+                                else:
+                                    print(f"⚠️ No path found for student {self.unique_id} at {self.position} after detecting shooter.")
+                                    # Optional: Add fallback behavior here
+                            except Exception as e:
+                                 print(f"Error during A* pathfinding for student {self.unique_id}: {e}")
+                                 # Handle error gracefully
+
+                            # Once awareness is triggered by *any* shooter, stop checking others
+                            break # <-- Important! Stop checking other shooters
+                        # **********************************************************
 
             # --- 2. Action Based on State ---
             # Define exit rect (needed for both states if checking collision)
@@ -181,6 +191,7 @@ class StudentAgent(SchoolAgent):
                 self._check_steal_weapon()
                 super().move_continuous(dt)
 
+    # ... (rest of the methods _check_steal_weapon, _avoid_student_collisions, _validate_locked_target, etc. remain unchanged) ...
     def _check_steal_weapon(self):
         """Check if the student can steal a weapon from an armed adult."""
         # This check should only happen if the student isn't already a shooter/armed
@@ -400,3 +411,4 @@ class StudentAgent(SchoolAgent):
 
         self.target_speed = self.max_speed * 0.7 # Move slower while searching
         # Velocity will be calculated by parent's move_continuous based on direction and target_speed + forces
+# --- END OF FILE studentagent.py ---
