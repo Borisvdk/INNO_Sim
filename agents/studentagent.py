@@ -1,12 +1,11 @@
-# --- START OF FILE studentagent.py ---
-
 import math
 import random
 import config
 import pygame
 from agents.schoolagent import SchoolAgent
 from dijkstra_test import astar
-from utilities import has_line_of_sight # Keep this, shooter still uses it
+from utilities import has_line_of_sight
+
 
 class StudentAgent(SchoolAgent):
     """Agent class for students with potential shooter behaviors."""
@@ -17,10 +16,10 @@ class StudentAgent(SchoolAgent):
 
         # Student-specific attributes
         self.fear_level = 0.0
-        self.grab_weapon_prob = 0.05 # Note: This is defined but not used in step logic
+        self.grab_weapon_prob = 0.05  # Note: This is defined but not used in step logic
         # self.state = "Normal" # State is implicitly handled by in_emergency now
         self.path = []
-        self.in_emergency = False # This is the primary state indicator
+        self.in_emergency = False  # This is the primary state indicator
         self.normal_speed = random.uniform(40.0, 60.0)
         self.emergency_speed = random.uniform(60.0, 90.0)
 
@@ -45,9 +44,6 @@ class StudentAgent(SchoolAgent):
         self.search_direction_change_time = 0
         self.shooter_start_time = 0.0
 
-    # at_exit method is likely redundant now due to rect check, but keep if needed elsewhere
-    # def at_exit(self):
-    #    return self.position[0] <= 0 or self.position[0] >= SIM_WIDTH or self.position[1] <= 0 or self.position[1] >= SIM_HEIGHT
 
     def step_continuous(self, dt):
         """
@@ -57,7 +53,7 @@ class StudentAgent(SchoolAgent):
         # --- Shooter Timeout ---
         if self.is_shooter:
             # ... (shooter timeout logic remains the same) ...
-            pass # Placeholder
+            pass  # Placeholder
 
         # --- Shooter Behavior ---
         if self.is_shooter:
@@ -72,11 +68,11 @@ class StudentAgent(SchoolAgent):
             else:
                 self._pursue_target(dt, current_time)
 
-            super().move_continuous(dt) # Use the base class movement logic
+            super().move_continuous(dt)  # Use the base class movement logic
 
         # --- Non-Shooter Behavior ---
         else:
-            triggered_emergency_this_step = False # Flag to calculate path only once
+            triggered_emergency_this_step = False  # Flag to calculate path only once
 
             # --- 1. Awareness Check (Only if not already fleeing) ---
             if not self.in_emergency:
@@ -92,15 +88,16 @@ class StudentAgent(SchoolAgent):
 
                             # Check if within awareness range
                             if dist_squared < config.AWARENESS_RANGE ** 2:
-                                print(f"Student {self.unique_id} detected shooter {shooter.unique_id} nearby! Entering emergency.")
+                                print(
+                                    f"Student {self.unique_id} detected shooter {shooter.unique_id} nearby! Entering emergency.")
                                 self.in_emergency = True
                                 triggered_emergency_this_step = True
-                                break # Stop checking other shooters once one is detected
+                                break  # Stop checking other shooters once one is detected
 
                 # --- 1b. Check for nearby SCREAMING students (if not already triggered by shooter) ---
                 if not self.in_emergency:
                     # Use spatial grid to find agents within scream radius + a buffer
-                    check_radius = config.SCREAM_RADIUS + self.radius # Check slightly larger area
+                    check_radius = config.SCREAM_RADIUS + self.radius  # Check slightly larger area
                     nearby_agents = self.model.spatial_grid.get_nearby_agents(self.position, check_radius)
                     scream_radius_sq = config.SCREAM_RADIUS ** 2
 
@@ -113,10 +110,11 @@ class StudentAgent(SchoolAgent):
                             dist_squared = dx * dx + dy * dy
 
                             if dist_squared < scream_radius_sq:
-                                print(f"Student {self.unique_id} heard scream from student {agent.unique_id}! Entering emergency.")
+                                print(
+                                    f"Student {self.unique_id} heard scream from student {agent.unique_id}! Entering emergency.")
                                 self.in_emergency = True
                                 triggered_emergency_this_step = True
-                                break # Stop checking other nearby agents once alerted by a scream
+                                break  # Stop checking other nearby agents once alerted by a scream
 
             # --- 1c. Calculate Path (if emergency was triggered this step) ---
             if triggered_emergency_this_step:
@@ -130,16 +128,17 @@ class StudentAgent(SchoolAgent):
                 try:
                     path = astar((self.position[0], self.position[1]),
                                  exit_center_target,
-                                 self.model.wall_rects) # Use pygame.Rect list
+                                 self.model.wall_rects)  # Use pygame.Rect list
                     if path:
                         self.path = path
                         print(f"Student {self.unique_id} calculated path to exit.")
                     else:
-                        print(f"⚠️ No path found for student {self.unique_id} at {self.position} after entering emergency.")
+                        print(
+                            f"⚠️ No path found for student {self.unique_id} at {self.position} after entering emergency.")
                         # Optional: Fallback if no path found (e.g., move away from avg threat)
                 except Exception as e:
-                     print(f"Error during A* pathfinding for student {self.unique_id}: {e}")
-                     # Handle error gracefully
+                    print(f"Error during A* pathfinding for student {self.unique_id}: {e}")
+                    # Handle error gracefully
 
             # --- 2. Action Based on State ---
             # Define exit rect (needed for collision check)
@@ -148,7 +147,8 @@ class StudentAgent(SchoolAgent):
             exit_y_start = 0
             exit_y_end = 2 * (config.SIM_HEIGHT / 40) + 10
             school_exit = pygame.Rect(exit_x_start, exit_y_start, exit_x_end - exit_x_start, exit_y_end - exit_y_start)
-            exit_center_target = ((exit_x_start + exit_x_end) / 2, exit_y_end / 2) # Recalculate here or pass from above
+            exit_center_target = (
+            (exit_x_start + exit_x_end) / 2, exit_y_end / 2)  # Recalculate here or pass from above
 
             # --- Emergency Evacuation State (Fleeing) ---
             if self.in_emergency:
@@ -156,7 +156,7 @@ class StudentAgent(SchoolAgent):
                 # 1. Check exit collision
                 if school_exit.collidepoint(self.position):
                     self.model.remove_agent(self)
-                    return # Agent removed
+                    return  # Agent removed
 
                 # 2. Follow path if available
                 if self.path:
@@ -169,64 +169,64 @@ class StudentAgent(SchoolAgent):
                     # Adjust tolerance based on speed and dt
                     waypoint_tolerance = move_speed * dt * 1.5
                     if dist < waypoint_tolerance:
-                         self.position = (target_x, target_y)
-                         self.path.pop(0)
-                         self.model.spatial_grid.update_agent(self)
-                         # If path is now empty, transition to moving towards exit center
-                         if not self.path:
+                        self.position = (target_x, target_y)
+                        self.path.pop(0)
+                        self.model.spatial_grid.update_agent(self)
+                        # If path is now empty, transition to moving towards exit center
+                        if not self.path:
                             print(f"Student {self.unique_id} reached end of path, moving towards exit center.")
-                    elif dist > 0: # Move towards waypoint
-                         step_dist = move_speed * dt
-                         new_x = self.position[0] + (dx / dist) * step_dist
-                         new_y = self.position[1] + (dy / dist) * step_dist
-                         # Basic boundary clamping
-                         new_x = max(self.radius, min(new_x, self.model.width - self.radius))
-                         new_y = max(self.radius, min(new_y, self.model.height - self.radius))
+                    elif dist > 0:  # Move towards waypoint
+                        step_dist = move_speed * dt
+                        new_x = self.position[0] + (dx / dist) * step_dist
+                        new_y = self.position[1] + (dy / dist) * step_dist
+                        # Basic boundary clamping
+                        new_x = max(self.radius, min(new_x, self.model.width - self.radius))
+                        new_y = max(self.radius, min(new_y, self.model.height - self.radius))
 
-                         # Check for wall collision before moving
-                         if not self.would_collide_with_wall((new_x, new_y)):
-                             old_pos = self.position
-                             self.position = (new_x, new_y)
-                             if old_pos != self.position:
-                                 self.model.spatial_grid.update_agent(self)
-                         else:
-                             # Simple wall collision response: try stopping path following momentarily
-                             print(f"Student {self.unique_id} path blocked by wall near {self.position}, trying exit center.")
-                             self.path = [] # Clear path to force move towards exit center
+                        # Check for wall collision before moving
+                        if not self.would_collide_with_wall((new_x, new_y)):
+                            old_pos = self.position
+                            self.position = (new_x, new_y)
+                            if old_pos != self.position:
+                                self.model.spatial_grid.update_agent(self)
+                        else:
+                            # Simple wall collision response: try stopping path following momentarily
+                            print(
+                                f"Student {self.unique_id} path blocked by wall near {self.position}, trying exit center.")
+                            self.path = []  # Clear path to force move towards exit center
 
                 # 3. Move towards exit center if no path (or path blocked)
                 else:
                     target_x, target_y = exit_center_target
                     dx, dy = target_x - self.position[0], target_y - self.position[1]
                     dist = math.hypot(dx, dy)
-                    move_speed = self.emergency_speed * 0.75 # Slightly slower direct move
+                    move_speed = self.emergency_speed * 0.75  # Slightly slower direct move
 
-                    if dist > self.radius: # Only move if not already very close
-                        step_dist = min(move_speed * dt, dist) # Don't overshoot
+                    if dist > self.radius:  # Only move if not already very close
+                        step_dist = min(move_speed * dt, dist)  # Don't overshoot
                         if dist > 0:
-                           new_x = self.position[0] + (dx / dist) * step_dist
-                           new_y = self.position[1] + (dy / dist) * step_dist
-                           new_x = max(self.radius, min(new_x, self.model.width - self.radius))
-                           new_y = max(self.radius, min(new_y, self.model.height - self.radius))
-                           # Check wall collision before moving
-                           if not self.would_collide_with_wall((new_x, new_y)):
+                            new_x = self.position[0] + (dx / dist) * step_dist
+                            new_y = self.position[1] + (dy / dist) * step_dist
+                            new_x = max(self.radius, min(new_x, self.model.width - self.radius))
+                            new_y = max(self.radius, min(new_y, self.model.height - self.radius))
+                            # Check wall collision before moving
+                            if not self.would_collide_with_wall((new_x, new_y)):
                                 old_pos = self.position
                                 self.position = (new_x, new_y)
                                 if old_pos != self.position:
                                     self.model.spatial_grid.update_agent(self)
-                           else:
-                               # Stuck even when moving towards center - maybe try random small nudge?
-                                pass # Avoid getting stuck in loops
+                            else:
+                                # Stuck even when moving towards center - maybe try random small nudge?
+                                pass  # Avoid getting stuck in loops
 
                 # 4. Simple collision avoidance specific to fleeing agents (optional enhancement)
-                self._avoid_student_collisions() # Apply nudge if overlapping
+                self._avoid_student_collisions()  # Apply nudge if overlapping
 
             # --- Normal Roaming State ---
-            else: # Not in emergency and not a shooter
+            else:  # Not in emergency and not a shooter
                 self._check_steal_weapon()
-                super().move_continuous(dt) # Use the base class movement logic
+                super().move_continuous(dt)  # Use the base class movement logic
 
-    # ... (rest of the methods _check_steal_weapon, _avoid_student_collisions, _validate_locked_target, etc. remain unchanged) ...
     def _check_steal_weapon(self):
         """Check if the student can steal a weapon from an armed adult."""
         # This check should only happen if the student isn't already a shooter/armed
@@ -243,7 +243,7 @@ class StudentAgent(SchoolAgent):
             # Check distance and line of sight
             dx = agent.position[0] - self.position[0]
             dy = agent.position[1] - self.position[1]
-            distance_sq = dx * dx + dy * dy # Use squared distance for efficiency
+            distance_sq = dx * dx + dy * dy  # Use squared distance for efficiency
             if distance_sq > config.STEAL_RANGE ** 2:
                 continue
 
@@ -261,7 +261,7 @@ class StudentAgent(SchoolAgent):
                 self.is_shooter = True
                 # Update student appearance
                 # self.color = config.COLORS["GREEN"] # Assuming GREEN is shooter
-                self.model.active_shooters.add(self) # Add to model's set
+                self.model.active_shooters.add(self)  # Add to model's set
                 print(f"Student {self.unique_id} stole weapon from {agent.unique_id} and became a shooter!")
 
                 # Important: Break after successful steal to avoid multiple steals per step
@@ -279,7 +279,8 @@ class StudentAgent(SchoolAgent):
 
         nudged = False
         # Check against *other* students only
-        nearby_agents = self.model.spatial_grid.get_nearby_agents(self.position, agent_rect_size) # Use small check radius
+        nearby_agents = self.model.spatial_grid.get_nearby_agents(self.position,
+                                                                  agent_rect_size)  # Use small check radius
         for other in nearby_agents:
             # Check if other agent exists, is a student, is not self, and is close enough
             if other != self and other in self.model.schedule and isinstance(other, StudentAgent):
@@ -295,12 +296,12 @@ class StudentAgent(SchoolAgent):
                     dx = self.position[0] - other.position[0]
                     dy = self.position[1] - other.position[1]
                     dist = math.hypot(dx, dy)
-                    nudge_strength = 0.8 # Slightly stronger nudge for fleeing
+                    nudge_strength = 0.8  # Slightly stronger nudge for fleeing
 
-                    if dist > 0.1: # Avoid division by zero / large forces if perfectly overlapped
+                    if dist > 0.1:  # Avoid division by zero / large forces if perfectly overlapped
                         nudge_x = (dx / dist) * nudge_strength
                         nudge_y = (dy / dist) * nudge_strength
-                    else: # Apply random nudge if perfectly overlapped
+                    else:  # Apply random nudge if perfectly overlapped
                         nudge_x = random.uniform(-nudge_strength, nudge_strength)
                         nudge_y = random.uniform(-nudge_strength, nudge_strength)
 
@@ -318,68 +319,81 @@ class StudentAgent(SchoolAgent):
                         nudged = True
                         # Update grid ONLY if position changed
                         if old_pos != self.position:
-                             self.model.spatial_grid.update_agent(self)
+                            self.model.spatial_grid.update_agent(self)
                         # Don't break immediately, might need to nudge away from multiple agents
                         # break # Apply only one nudge per step might be okay too
 
         # No need to return nudged status unless used elsewhere
 
-    # --- Shooter specific methods remain unchanged ---
     def _validate_locked_target(self, current_time):
-       # ... (keep existing code) ...
-       # Add check if target still in model.schedule
+        """Validate if the currently locked target is still valid and visible."""
+        # Basic existence check
         if self.locked_target is None:
             return False
+
+        # Check if target still exists in simulation
         if self.locked_target not in self.model.schedule:
-            #print(f"Shooter {self.unique_id} lost target {self.locked_target.unique_id} (removed)") # Reduce noise
+            # print(f"Shooter {self.unique_id} lost target {self.locked_target.unique_id} (removed)")
             self.locked_target = None
             return False
-        # ... rest of validation ...
+
+        # Check distance
         target_x, target_y = self.locked_target.position
         dx = target_x - self.position[0]
         dy = target_y - self.position[1]
         distance_squared = dx * dx + dy * dy
         if distance_squared > self.target_release_distance * self.target_release_distance:
-            #print(f"Shooter {self.unique_id} released target {self.locked_target.unique_id} (too far)")
+            # print(f"Shooter {self.unique_id} released target {self.locked_target.unique_id} (too far)")
             self.locked_target = None
             return False
+
+        # Check pursuit time
         time_since_locked = current_time - self.target_lock_time
         if time_since_locked > self.max_target_pursuit_time:
-            #print(f"Shooter {self.unique_id} switching targets after pursuing {self.locked_target.unique_id} too long")
+            # print(f"Shooter {self.unique_id} switching targets after pursuing {self.locked_target.unique_id} too long")
             self.locked_target = None
             return False
+
+        # Check line of sight
         has_sight = self.has_line_of_sight(self.locked_target.position)
         if has_sight:
             self.target_last_seen_time = current_time
             return True
         else:
+            # IMPROVED: Reduce time to lose target when it's behind a wall
+            # This makes the shooter more realistic in not "remembering" targets
+            # that have gone behind walls for too long
             time_since_last_seen = current_time - self.target_last_seen_time
-            if time_since_last_seen > self.max_target_lost_time:
-                #print(f"Shooter {self.unique_id} lost target {self.locked_target.unique_id} (out of sight)")
+            max_memory_time = min(1.0, self.max_target_lost_time / 2)  # Reduced from default value
+
+            if time_since_last_seen > max_memory_time:
+                # print(f"Shooter {self.unique_id} lost target {self.locked_target.unique_id} (out of sight)")
                 self.locked_target = None
                 return False
             else:
-                return True # Still pursuing briefly
+                # Target temporarily hidden but still being pursued
+                return True
 
     def _find_new_target(self, current_time):
-        # ... (keep existing code) ...
+        """Find a new target among nearby agents, checking for line of sight."""
         search_radius = self.target_lock_distance
         nearby_agents = self.model.spatial_grid.get_nearby_agents(self.position, search_radius)
         visible_targets = []
+
         for agent in nearby_agents:
-             # Check agent still exists and is valid target type
+            # Check agent still exists and is valid target type
             if agent != self and agent in self.model.schedule and agent.agent_type in ["student", "adult"]:
-                # Check Line of Sight first
+                # CRITICAL: Explicit line of sight check before considering a target
                 if self.has_line_of_sight(agent.position):
                     dx = self.position[0] - agent.position[0]
                     dy = self.position[1] - agent.position[1]
                     distance_squared = dx * dx + dy * dy
                     # Ensure distance is within lock distance BEFORE adding
                     if distance_squared <= search_radius * search_radius:
-                         visible_targets.append((agent, distance_squared))
+                        visible_targets.append((agent, distance_squared))
 
         if not visible_targets:
-            self.locked_target = None # Ensure target is cleared if none found
+            self.locked_target = None  # Ensure target is cleared if none found
             return
 
         # Sort by distance squared (faster)
@@ -392,46 +406,64 @@ class StudentAgent(SchoolAgent):
         self.target_last_seen_time = current_time
         # print(f"Shooter {self.unique_id} locked onto {self.locked_target.unique_id}")
 
-
     def _pursue_target(self, dt, current_time):
-        # ... (keep existing code, ensure self.velocity is updated correctly for base move) ...
-        # This method primarily sets the *intent* (target direction/speed)
-        # The actual movement including avoidance is handled by super().move_continuous() called for shooters
+        """Pursue a locked target, moving toward it and shooting when in range and has line of sight."""
+        # Ensure we have a valid target
+        if self.locked_target is None or self.locked_target not in self.model.schedule:
+            return
+
         target_x, target_y = self.locked_target.position
         dx = target_x - self.position[0]
         dy = target_y - self.position[1]
-        distance = math.sqrt(dx * dx + dy * dy) # Need actual distance here
+        distance = math.sqrt(dx * dx + dy * dy)  # Need actual distance here
+
+        # Calculate target angle REGARDLESS of distance
+        # This fixes the UnboundLocalError
+        target_angle = math.atan2(dy, dx)
+
+        # Check for line of sight to target
         has_sight = self.has_line_of_sight(self.locked_target.position)
 
         # Check wall stuck logic
         self._check_wall_stuck(dt)
 
-        if distance > self.shooting_range * 0.9: # Move if outside 90% of shooting range
-            target_angle = math.atan2(dy, dx)
-            self.direction = target_angle # Set desired direction
-            self.target_speed = self.max_speed # Set desired speed
+        if distance > self.shooting_range * 0.9:  # Move if outside 90% of shooting range
+            self.direction = target_angle  # Set desired direction
+            self.target_speed = self.max_speed  # Set desired speed
 
-            # Basic attempt to navigate if no direct sight (relies heavily on avoidance forces)
+            # Improved navigation for obscured targets
             if not has_sight:
-                 # If stuck against a wall, change direction more drastically
+                # If stuck against a wall, change direction more drastically
                 if self.wall_stuck_time > 0.1:
                     print(f"Shooter {self.unique_id} stuck pursuing, changing direction.")
                     # Try turning away from the wall or target slightly
-                    self.direction += random.uniform(-math.pi/2, math.pi/2)
+                    self.direction += random.uniform(-math.pi / 2, math.pi / 2)
                     self.direction %= (2 * math.pi)
-                    self.wall_stuck_time = 0 # Reset stuck timer after adjustment
+                    self.wall_stuck_time = 0  # Reset stuck timer after adjustment
                 else:
-                    # Rely on avoidance forces from move_continuous for minor adjustments
-                    pass
+                    # Try to find a path around the obstacle
+                    # This is a simple approximation - could be enhanced with pathfinding
+                    self.direction += random.uniform(-math.pi / 4, math.pi / 4)
+                    self.direction %= (2 * math.pi)
+                    self.target_speed *= 0.8  # Slow down a bit when navigating around obstacles
 
-        else: # In shooting range
-            self.target_speed = 0 # Stop trying to move forward
-            self.velocity = (0,0) # Explicitly stop velocity (base move might override otherwise)
+        else:  # In shooting range
+            self.target_speed = 0  # Stop trying to move forward
+            self.velocity = (0, 0)  # Explicitly stop velocity (base move might override otherwise)
 
+            # Only shoot if we have line of sight AND enough time has elapsed
             if current_time - self.last_shot_time >= self.shooting_interval:
+                # CRITICAL: Explicit line of sight check before shooting
                 if has_sight:
                     self._shoot_at_target(self.locked_target, current_time)
-                # else: Cannot shoot, no LoS
+                else:
+                    # If no line of sight but target is in range, try to reposition
+                    # This encourages the shooter to move to get a better angle
+                    self.target_speed = self.max_speed * 0.5
+                    # Try to move perpendicular to target direction to get around obstacles
+                    perp_angle = target_angle + (math.pi / 2)
+                    perp_direction = random.choice([perp_angle, perp_angle - math.pi]) % (2 * math.pi)
+                    self.direction = perp_direction
 
     def _check_wall_stuck(self, dt):
         """ Checks if the agent is stuck against a wall while pursuing. """
@@ -459,14 +491,20 @@ class StudentAgent(SchoolAgent):
         #     # Action to take when stuck (handled in _pursue_target now)
         #     pass
 
-
     def _shoot_at_target(self, target, current_time):
-        # ... (keep existing code) ...
+        """Shoot at a target, but only if there's a clear line of sight."""
         # Ensure target exists before trying to access position
         if target not in self.model.schedule:
-             print(f"Shooter {self.unique_id} tried to shoot removed target {target.unique_id}")
-             self.locked_target = None
-             return
+            print(f"Shooter {self.unique_id} tried to shoot removed target {target.unique_id}")
+            self.locked_target = None
+            return
+
+        # CRITICAL FIX: Double-check line of sight before shooting
+        # This ensures we never shoot through walls even if target validation
+        # temporarily allows targeting when line of sight is lost
+        if not self.has_line_of_sight(target.position):
+            # Cannot shoot at target behind a wall
+            return
 
         shot = {'start_pos': self.position, 'end_pos': target.position, 'start_time': current_time}
         self.model.active_shots.append(shot)
@@ -481,30 +519,28 @@ class StudentAgent(SchoolAgent):
             # Important: Ensure we remove the *correct* target instance
             target_to_remove = target
             if self.locked_target == target_to_remove:
-                self.locked_target = None # Unlock before removing
-            self.model.remove_agent(target_to_remove) # Critical: Remove target
+                self.locked_target = None  # Unlock before removing
+            self.model.remove_agent(target_to_remove)  # Critical: Remove target
 
         else:
-             # print(f"Shooter {self.unique_id} missed") # Reduce miss noise
-             pass
+            # print(f"Shooter {self.unique_id} missed") # Reduce miss noise
+            pass
 
         self.last_shot_time = current_time
-
 
     def search_behavior(self, dt):
         # ... (keep existing code, ensure self.velocity/target_speed is set for base move) ...
         # Set target speed and direction for parent's move_continuous
         current_time = self.model.simulation_time
-        if not hasattr(self, 'search_start_time') or self.search_start_time == 0: # Initialize if needed
+        if not hasattr(self, 'search_start_time') or self.search_start_time == 0:  # Initialize if needed
             self.search_start_time = current_time
             self.search_direction_change_time = 0
-            self.direction = random.uniform(0, 2 * math.pi) # Initial random direction
+            self.direction = random.uniform(0, 2 * math.pi)  # Initial random direction
 
         # Change direction periodically
-        if current_time - self.search_direction_change_time > 3.0: # Change every 3 seconds
+        if current_time - self.search_direction_change_time > 3.0:  # Change every 3 seconds
             self.direction = random.uniform(0, 2 * math.pi)
             self.search_direction_change_time = current_time
 
-        self.target_speed = self.max_speed * 0.6 # Move slower while searching
+        self.target_speed = self.max_speed * 0.6  # Move slower while searching
         # Base class move_continuous will handle actual movement and avoidance
-# --- END OF FILE studentagent.py ---
