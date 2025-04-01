@@ -3,17 +3,18 @@ import json
 
 # Grid settings
 GRID_SIZE = 10  # Size of each grid cell in pixels
-GRID_WIDTH = 60  # Number of columns
-GRID_HEIGHT = 40  # Number of rows
+GRID_WIDTH = 120  # Number of columns
+GRID_HEIGHT = 80  # Number of rows
 
 # Colors
 WHITE = (255, 255, 255)
 GRAY = (200, 200, 200)
 BLACK = (0, 0, 0)
 GREEN = (0, 255, 0)
+RED = (255, 0, 0)  # Define red color
 
 # Available colors
-COLOR_MAP = {1: WHITE, 2: BLACK, 3: GREEN}
+COLOR_MAP = {1: WHITE, 2: BLACK, 3: GREEN, 4: RED}  # Add red to the color map
 
 # Initialize grid with all white (empty space)
 grid = [[WHITE for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
@@ -150,6 +151,8 @@ def main():
                     current_color = BLACK
                 elif event.key == pygame.K_3:
                     current_color = GREEN
+                elif event.key == pygame.K_4:  # Switch to red
+                    current_color = RED
 
             if not paused:
                 if event.type == pygame.MOUSEBUTTONDOWN:
