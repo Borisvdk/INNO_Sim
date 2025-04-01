@@ -4,7 +4,7 @@ import os
 from grid_converter import integrate_grid_into_simulation
 import config
 import pygame # Ensure pygame is imported
-from dijkstra_test import astar
+from a_star import astar
 
 
 class AgentFactory:
