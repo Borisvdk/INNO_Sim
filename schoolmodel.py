@@ -152,6 +152,8 @@ class SchoolModel:
         # Removed self._create_wall_grid() call if it was only for optimization (LoS uses direct check)
         self._create_all_agents()
 
+    # In the _create_all_agents method of SchoolModel, ensure adults with weapons are properly configured:
+
     def _create_all_agents(self):
         """Create all agents at safe positions - no shooter at the beginning"""
         # Generate safe positions for all agents ahead of time
@@ -192,16 +194,17 @@ class SchoolModel:
         for i in range(self.num_adults):
             position = all_positions[i + self.num_students]
             agent = AgentFactory.create_agent("adult", i + self.num_students, self, position)
-            # Controleer of deze volwassen agent een wapen krijgt:
+
+            # Configure if this adult has a weapon
             if random.random() < self.adult_weapon_percentage:
                 agent.has_weapon = True
-                agent.color = (255, 255, 0)  # Gele kleur
-            # Indien geen wapen, blijft de agent zijn standaardkleur behouden
+                agent.color = (255, 255, 0)  # Yellow for armed adults
+                print(f"Adult {agent.unique_id} is armed and ready to respond")
+            else:
+                agent.has_weapon = False
+
             self.schedule.append(agent)
             self.spatial_grid.update_agent(agent)
-
-    # REMOVE or comment out the _create_wall_grid method if not used elsewhere
-    # def _create_wall_grid(self): ...
 
     def step_continuous(self, dt):
         """Perform a continuous time step with delta time dt."""
