@@ -1,3 +1,5 @@
+# --- START OF FILE config.py ---
+
 """
 Configuration file for the school safety simulation.
 All important simulation parameters are defined here.
@@ -51,10 +53,14 @@ STEAL_PROBABILITY = 0.001  # Probability per step to attempt stealing
 
 # Response & awareness parameters
 ADULT_RESPONSE_DELAY_RANGE = (2, 5)  # (min, max) time steps
+# ***** NEW PARAMETER *****
+AWARENESS_RANGE = 50  # Distance (units) within which students become aware of a shooter
+SCREAM_RADIUS = 25
+# *************************
 
 # Visualization parameters
 VISION_CONE_ANGLE = 120  # Degrees
-MAX_VISION_DISTANCE = 150  # Units
+MAX_VISION_DISTANCE = 150  # Units # Still used for shooter visualization
 SHOT_VISUALIZATION_DURATION = 0.5  # Seconds
 ALERT_DURATION = 5.0  # Seconds
 
@@ -82,3 +88,4 @@ KEY_MAPPING = {
     "EMERGENCY_EVACUATION": "e",
     "ADD_SHOOTER": "x"  # New key for manually adding a shooter
 }
+# --- END OF FILE config.py ---

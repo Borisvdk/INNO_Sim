@@ -5,7 +5,7 @@ from schoolmodel import SchoolModel
 from visualization import Visualizer
 from agents.studentagent import StudentAgent
 from agents.adultagent import AdultAgent
-from dijkstra_test import astar
+from a_star import astar
 import config
 
 def run_pygame_simulation():
