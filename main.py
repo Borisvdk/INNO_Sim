@@ -102,6 +102,12 @@ def run_pygame_simulation():
         # Update model
         model.step_continuous(sim_dt)
 
+        if model.should_terminate:
+            print(f"Simulatie wordt beëindigd {config.TERMINATION_DELAY_AFTER_SHOOTER:.1f} seconden na de eerste schutter.")
+            running = False
+            time.sleep(1)
+            continue
+
         # FPS calculation - improved moving average method
         current_frame_time = time.time() - frame_start_time
         if current_frame_time > 0:
