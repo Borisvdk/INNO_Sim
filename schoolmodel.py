@@ -131,6 +131,10 @@ class SchoolModel:
         self.shooter_emergence_probability = config.SHOOTER_EMERGENCE_PROBABILITY
         self.spatial_grid = SpatialGrid(width, height, cell_size=max(config.STUDENT_RADIUS, config.ADULT_RADIUS) * 4) # Adjust cell size maybe?
 
+        self.shooter_appeared_flag = False
+        self.first_shooter_appearance_time = 0.0
+        self.terminate_simulation = False
+
         # Load walls from grid file or use default configuration
         if grid_file and os.path.exists(grid_file):
             print(f"Loading walls from grid file: {grid_file}")
@@ -208,17 +212,30 @@ class SchoolModel:
 
     def step_continuous(self, dt):
         """Perform a continuous time step with delta time dt."""
+        if self.terminate_simulation:
+             # Optioneel: print hier nog iets of doe niks extra's.
+             # De main loop zal de property `should_terminate` checken.
+             return # Stop verdere verwerking van deze stap
+
         self.simulation_time += dt
 
         # Check for random shooter emergence
         if not self.has_active_shooter and self.simulation_time - self.last_shooter_check_time >= self.shooter_check_interval:
             self.last_shooter_check_time = self.simulation_time
-            self._check_for_shooter_emergence()
+            self._check_for_shooter_emergence() # Deze functie zet mogelijk has_active_shooter op True
 
-        # --- REMOVED CALL TO run_to_exit ---
-        # if self.has_active_shooter:
-        #     self.run_to_exit() # REMOVE THIS LINE
-        # ------------------------------------
+        # Check if a shooter has appeared
+        if self.has_active_shooter and not self.shooter_appeared_flag:
+            self.shooter_appeared_flag = True
+            self.first_shooter_appearance_time = self.simulation_time
+            print(f"--- EERSTE SCHUTTER GEDETECTEERD op tijd {self.simulation_time:.1f}s. Simulatie eindigt over {config.TERMINATION_DELAY_AFTER_SHOOTER}s ---")
+
+        # Check if the simulation should terminate after a shooter appears
+        if self.shooter_appeared_flag:
+            if self.simulation_time - self.first_shooter_appearance_time >= config.TERMINATION_DELAY_AFTER_SHOOTER:
+                self.terminate_simulation = True
+                print(f"--- SIMULATIE TERMINATIE GETRIGGERD op tijd {self.simulation_time:.1f}s ---")
+                # We stoppen niet direct hier, maar zetten de flag zodat de main loop kan stoppen.
 
         # Shuffle and step agents
         random.shuffle(self.schedule) # Consider if shuffling is still needed or detrimental
@@ -226,7 +243,7 @@ class SchoolModel:
         for agent in agents_to_process:
             # Ensure agent is still in the main schedule before stepping
             if agent in self.schedule:
-                 agent.step_continuous(dt)
+                 agent.step_continuous(dt) # Stap van de agent uitvoeren
 
 
     def _check_for_shooter_emergence(self):
@@ -261,12 +278,24 @@ class SchoolModel:
         self.active_shooters.add(random_student)
         print(f"MANUAL ALERT: Student {random_student.unique_id} has become an active shooter "
               f"at time {self.simulation_time:.1f}s")
+        
+        if not self.shooter_appeared_flag:
+            self.shooter_appeared_flag = True
+            self.first_shooter_appearance_time = self.simulation_time
+            print(f"--- EERSTE SCHUTTER (handmatig) GEDETECTEERD op tijd {self.simulation_time:.1f}s. Simulatie eindigt over {config.TERMINATION_DELAY_AFTER_SHOOTER}s ---")
+
         return True
 
     @property
     def has_active_shooter(self):
         """Check if there is at least one active shooter."""
         return len(self.active_shooters) > 0
+    
+    @property
+    def should_terminate(self):
+        """Property om aan te geven of de simulatie moet stoppen."""
+        return self.terminate_simulation
+
 
     def add_students(self, count):
         """Add a specified number of students to the simulation."""

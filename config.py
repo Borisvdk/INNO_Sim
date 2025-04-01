@@ -19,6 +19,9 @@ INITIAL_ADULTS = 20
 # Weapon odds
 ADULT_WEAPON_PROBABILITY = 0.5
 
+# Simulation termination time
+TERMINATION_DELAY_AFTER_SHOOTER = 30.0
+
 # Agent physical properties
 STUDENT_RADIUS = 3.0
 ADULT_RADIUS = 4.0
