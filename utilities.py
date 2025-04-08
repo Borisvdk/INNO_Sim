@@ -47,30 +47,30 @@ def line_intersects_rectangle(line_x1, line_y1, line_x2, line_y2, wall_rect):
         return False
 
 
-def has_line_of_sight(start_pos, end_pos, wall_rects):
+def has_line_of_sight(start_pos, end_pos, obstacles): # Changed walls to obstacles
     """
-    Check if there's a line of sight between start_pos and end_pos, avoiding wall Rects.
+    Check if there's a line of sight between start_pos and end_pos, avoiding obstacles.
 
     Args:
         start_pos: Tuple (x, y) of the starting position
         end_pos: Tuple (x, y) of the ending position
-        wall_rects: List of pygame.Rect objects representing walls.
+        obstacles: List of pygame.Rect objects representing vision-blocking elements (walls and doors).
 
     Returns:
-        True if there's a clear line of sight, False if a wall blocks the view
+        True if there's a clear line of sight, False if an obstacle blocks the view
     """
     start_x, start_y = start_pos
     end_x, end_y = end_pos
 
-    # Check each wall rectangle for intersection
-    for wall_rect in wall_rects:
+    # Check each obstacle rectangle for intersection
+    for obstacle_rect in obstacles: # Iterate through combined list
         if line_intersects_rectangle(
             start_x, start_y, end_x, end_y,
-            wall_rect # Pass the pygame.Rect directly
+            obstacle_rect # Pass the pygame.Rect directly
         ):
-            return False # Wall blocks line of sight
+            return False # Obstacle blocks line of sight
 
-    # No walls block the view
+    # No obstacles block the view
     return True
 
 
@@ -81,15 +81,15 @@ def distance_squared(pos1, pos2):
     return dx * dx + dy * dy
 
 
-def cast_ray(start_pos, angle, max_distance, wall_rects):
+def cast_ray(start_pos, angle, max_distance, obstacles): # Changed walls to obstacles
     """
-    Cast a ray from start_pos, checking intersections with wall Rects.
+    Cast a ray from start_pos, checking intersections with obstacle Rects.
 
     Args:
         start_pos: Tuple (x, y)
         angle: Angle in radians
         max_distance: Maximum distance
-        wall_rects: List of pygame.Rect objects for walls
+        obstacles: List of pygame.Rect objects for vision-blocking elements (walls and doors)
 
     Returns:
         Tuple (x, y) of the endpoint (either max_distance or collision point)
@@ -97,37 +97,29 @@ def cast_ray(start_pos, angle, max_distance, wall_rects):
     start_x, start_y = start_pos
     dx = math.cos(angle)
     dy = math.sin(angle)
-
-    # Calculate potential end point
     ray_end_x = start_x + dx * max_distance
     ray_end_y = start_y + dy * max_distance
 
     closest_intersection = (ray_end_x, ray_end_y)
     min_dist_sq = max_distance * max_distance
 
-    for wall_rect in wall_rects:
+    for obstacle_rect in obstacles: # Iterate through combined list
         # Define the 4 edges of the rectangle
         edges = [
-            (wall_rect.topleft, wall_rect.topright),
-            (wall_rect.bottomleft, wall_rect.bottomright),
-            (wall_rect.topleft, wall_rect.bottomleft),
-            (wall_rect.topright, wall_rect.bottomright)
+            (obstacle_rect.topleft, obstacle_rect.topright),
+            (obstacle_rect.bottomleft, obstacle_rect.bottomright),
+            (obstacle_rect.topleft, obstacle_rect.bottomleft),
+            (obstacle_rect.topright, obstacle_rect.bottomright)
         ]
-
         for p1, p2 in edges:
             edge_x1, edge_y1 = p1
             edge_x2, edge_y2 = p2
-
             intersection = line_line_intersection(
-                start_x, start_y, ray_end_x, ray_end_y, # The full potential ray
-                edge_x1, edge_y1, edge_x2, edge_y2      # The wall edge
+                start_x, start_y, ray_end_x, ray_end_y,
+                edge_x1, edge_y1, edge_x2, edge_y2
             )
-
             if intersection:
-                ix, iy = intersection
                 dist_sq = distance_squared(start_pos, intersection)
-
-                # If this intersection is closer than the current minimum
                 if dist_sq < min_dist_sq:
                     min_dist_sq = dist_sq
                     closest_intersection = intersection

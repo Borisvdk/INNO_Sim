@@ -144,20 +144,23 @@ class SchoolModel:
         # --- Wall and Exit Loading ---
         self.walls = []  # Now list of pygame.Rect
         self.exits = []  # List of pygame.Rect for exits
+        self.doors = []
 
         if grid_file and os.path.exists(grid_file):
-            print(f"Loading walls and exits from grid file: {grid_file}")
-            # integrate_grid_into_simulation now returns (walls, exits)
-            loaded_walls, loaded_exits = integrate_grid_into_simulation(grid_file, width, height)
-            self.walls = loaded_walls # walls are now pygame.Rect
-            self.exits = loaded_exits
-            print(f"Loaded {len(self.walls)} wall rects and {len(self.exits)} exit rects.")
-            if not self.exits:
-                print("Warning: No exits defined in the grid file!")
+                print(f"Loading elements from grid file: {grid_file}")
+                # integrate_grid_into_simulation now returns (walls, exits, doors)
+                loaded_walls, loaded_exits, loaded_doors = integrate_grid_into_simulation(grid_file, width, height)
+                self.walls = loaded_walls
+                self.exits = loaded_exits
+                self.doors = loaded_doors # <-- Store loaded doors
+                print(f"Model initialized with {len(self.walls)} walls, {len(self.exits)} exits, {len(self.doors)} doors.")
+                if not self.exits and not self.doors and not self.walls:
+                    print("Warning: Grid file loaded but resulted in zero walls, exits, or doors.")
+                elif not self.exits:
+                    print("Warning: No exits defined in the grid file!")
         else:
-            print("Warning: Grid file not found or not specified. Using default empty walls/exits.")
-            # Define default walls/exits if needed, otherwise they remain empty lists
-            # Example default: add outer boundary walls as Rects
+            print("Warning: Grid file not found or not specified. Using default empty walls/exits/doors.")
+
             wall_thickness = 5 # Example thickness
             self.walls.append(pygame.Rect(0, 0, width, wall_thickness)) # Top
             self.walls.append(pygame.Rect(0, height - wall_thickness, width, wall_thickness)) # Bottom
@@ -166,11 +169,14 @@ class SchoolModel:
             # Define a default exit if desired when no grid file is used
             # self.exits.append(pygame.Rect(width * 0.8, 0, width * 0.1, 10)) # Example top-right exit
 
-        # --- Pass wall Rects to A* ---
-        # The a_star implementation expects pygame.Rect objects, which self.walls now contains.
-        self.wall_rects = self.walls # Direct assignment is sufficient
+        self.wall_rects = self.walls # This list is used for pathfinding obstacles
+
+        # --- Combine walls and doors for vision checks ---
+        # This can be done here or dynamically in the utility functions
+        self.visual_obstacles = self.walls + self.doors # <-- Pre-combine for LoS/Raycasting
 
         self._create_all_agents()
+
 
     # In the _create_all_agents method of SchoolModel, ensure adults with weapons are properly configured:
 
@@ -315,6 +321,11 @@ class SchoolModel:
     @property
     def exit_rects(self):
         return self.exits
+    
+    @property
+    def vision_blocking_obstacles(self):
+        """Returns a combined list of walls and doors for vision checks."""
+        return self.walls + self.doors
 
     def add_students(self, count):
         """Add a specified number of students to the simulation."""

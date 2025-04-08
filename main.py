@@ -191,7 +191,7 @@ def run_pygame_simulation():
             simulation_time=model.simulation_time,
             sim_speed=sim_speed,
             fps=current_fps,
-            show_line_of_sight=show_line_of_sight,
+            show_vision=show_line_of_sight,
             show_safe_areas=show_safe_areas
         )
 
