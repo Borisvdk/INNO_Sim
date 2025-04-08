@@ -31,41 +31,30 @@ def point_in_rectangle(x, y, rect_x1, rect_y1, rect_x2, rect_y2):
     return (rect_x1 <= x <= rect_x2 and rect_y1 <= y <= rect_y2)
 
 
-def line_intersects_rectangle(line_x1, line_y1, line_x2, line_y2, rect_x1, rect_y1, rect_x2, rect_y2):
+def line_intersects_rectangle(line_x1, line_y1, line_x2, line_y2, wall_rect):
     """
-    Check if a line intersects with a rectangle.
+    Check if a line intersects with a pygame.Rect wall.
+    Uses pygame.Rect.clipline internally.
     """
-    # Check if either endpoint is inside the rectangle
-    if point_in_rectangle(line_x1, line_y1, rect_x1, rect_y1, rect_x2, rect_y2) or \
-            point_in_rectangle(line_x2, line_y2, rect_x1, rect_y1, rect_x2, rect_y2):
-        return True
-
-    # Check if line intersects with any of the four edges of the rectangle
-    rect_edges = [
-        (rect_x1, rect_y1, rect_x2, rect_y1),  # Top edge
-        (rect_x1, rect_y2, rect_x2, rect_y2),  # Bottom edge
-        (rect_x1, rect_y1, rect_x1, rect_y2),  # Left edge
-        (rect_x2, rect_y1, rect_x2, rect_y2)  # Right edge
-    ]
-
-    for edge_x1, edge_y1, edge_x2, edge_y2 in rect_edges:
-        if line_segments_intersect(
-                line_x1, line_y1, line_x2, line_y2,
-                edge_x1, edge_y1, edge_x2, edge_y2
-        ):
-            return True
-
-    return False
+    try:
+        # clipline returns the clipped line segment within the rect if it intersects,
+        # or an empty tuple () if it doesn't.
+        clipped_line = wall_rect.clipline(line_x1, line_y1, line_x2, line_y2)
+        return bool(clipped_line) # True if clipline didn't return empty tuple
+    except TypeError:
+        # Handle potential errors if coordinates are not numbers
+        print(f"Warning: TypeError in clipline with line ({line_x1},{line_y1})-({line_x2},{line_y2}) and rect {wall_rect}")
+        return False
 
 
-def has_line_of_sight(start_pos, end_pos, walls):
+def has_line_of_sight(start_pos, end_pos, wall_rects):
     """
-    Check if there's a line of sight between start_pos and end_pos.
+    Check if there's a line of sight between start_pos and end_pos, avoiding wall Rects.
 
     Args:
         start_pos: Tuple (x, y) of the starting position
         end_pos: Tuple (x, y) of the ending position
-        walls: List of wall coordinates (x_min, y_min, x_max, y_max)
+        wall_rects: List of pygame.Rect objects representing walls.
 
     Returns:
         True if there's a clear line of sight, False if a wall blocks the view
@@ -73,13 +62,13 @@ def has_line_of_sight(start_pos, end_pos, walls):
     start_x, start_y = start_pos
     end_x, end_y = end_pos
 
-    # Check each wall for intersection
-    for wall in walls:
+    # Check each wall rectangle for intersection
+    for wall_rect in wall_rects:
         if line_intersects_rectangle(
-                start_x, start_y, end_x, end_y,
-                wall[0], wall[1], wall[2], wall[3]
+            start_x, start_y, end_x, end_y,
+            wall_rect # Pass the pygame.Rect directly
         ):
-            return False  # Wall blocks line of sight
+            return False # Wall blocks line of sight
 
     # No walls block the view
     return True
@@ -92,59 +81,56 @@ def distance_squared(pos1, pos2):
     return dx * dx + dy * dy
 
 
-def cast_ray(start_pos, angle, max_distance, walls):
+def cast_ray(start_pos, angle, max_distance, wall_rects):
     """
-    Cast a ray from start_pos in the given angle direction until it hits a wall or reaches max_distance.
+    Cast a ray from start_pos, checking intersections with wall Rects.
 
     Args:
-        start_pos: Tuple (x, y) of the starting position
-        angle: Angle in radians for the ray direction
-        max_distance: Maximum distance for the ray
-        walls: List of wall coordinates (x_min, y_min, x_max, y_max)
+        start_pos: Tuple (x, y)
+        angle: Angle in radians
+        max_distance: Maximum distance
+        wall_rects: List of pygame.Rect objects for walls
 
     Returns:
-        Tuple (x, y) of the endpoint of the ray
+        Tuple (x, y) of the endpoint (either max_distance or collision point)
     """
-    # Calculate the ray direction vector
+    start_x, start_y = start_pos
     dx = math.cos(angle)
     dy = math.sin(angle)
 
-    # Calculate the ray end point if it doesn't hit anything
-    end_x = start_pos[0] + dx * max_distance
-    end_y = start_pos[1] + dy * max_distance
+    # Calculate potential end point
+    ray_end_x = start_x + dx * max_distance
+    ray_end_y = start_y + dy * max_distance
 
-    # Initialize the closest intersection point to the max distance
-    closest_intersection = (end_x, end_y)
-    closest_dist_squared = max_distance * max_distance
+    closest_intersection = (ray_end_x, ray_end_y)
+    min_dist_sq = max_distance * max_distance
 
-    # Check intersection with each wall
-    for wall in walls:
-        wall_x1, wall_y1, wall_x2, wall_y2 = wall
-
-        # Check all four edges of the wall
+    for wall_rect in wall_rects:
+        # Define the 4 edges of the rectangle
         edges = [
-            (wall_x1, wall_y1, wall_x2, wall_y1),  # Top edge
-            (wall_x1, wall_y2, wall_x2, wall_y2),  # Bottom edge
-            (wall_x1, wall_y1, wall_x1, wall_y2),  # Left edge
-            (wall_x2, wall_y1, wall_x2, wall_y2)  # Right edge
+            (wall_rect.topleft, wall_rect.topright),
+            (wall_rect.bottomleft, wall_rect.bottomright),
+            (wall_rect.topleft, wall_rect.bottomleft),
+            (wall_rect.topright, wall_rect.bottomright)
         ]
 
-        for edge_x1, edge_y1, edge_x2, edge_y2 in edges:
-            # Calculate intersection using the line-line intersection formula
+        for p1, p2 in edges:
+            edge_x1, edge_y1 = p1
+            edge_x2, edge_y2 = p2
+
             intersection = line_line_intersection(
-                start_pos[0], start_pos[1], end_x, end_y,
-                edge_x1, edge_y1, edge_x2, edge_y2
+                start_x, start_y, ray_end_x, ray_end_y, # The full potential ray
+                edge_x1, edge_y1, edge_x2, edge_y2      # The wall edge
             )
 
             if intersection:
-                # Calculate distance to intersection (squared)
                 ix, iy = intersection
-                dist_squared = (ix - start_pos[0]) ** 2 + (iy - start_pos[1]) ** 2
+                dist_sq = distance_squared(start_pos, intersection)
 
-                # Keep the closest intersection
-                if dist_squared < closest_dist_squared:
+                # If this intersection is closer than the current minimum
+                if dist_sq < min_dist_sq:
+                    min_dist_sq = dist_sq
                     closest_intersection = intersection
-                    closest_dist_squared = dist_squared
 
     return closest_intersection
 

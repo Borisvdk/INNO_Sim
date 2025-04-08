@@ -113,7 +113,6 @@ class SchoolModel:
                  grid_file=None):
         """
         Initialize the school simulation model.
-        ... (docstring remains the same) ...
         """
         self.num_students = n_students
         self.num_adults = n_adults
@@ -125,12 +124,10 @@ class SchoolModel:
         self.active_shots = []
         self.simulation_time = 0.0
         self.active_shooters = set()
-        # Remove self.tick_count if only used by run_to_exit
-        # self.tick_count = 0
         self.shooter_check_interval = config.SHOOTER_CHECK_INTERVAL
         self.last_shooter_check_time = 0.0
         self.shooter_emergence_probability = config.SHOOTER_EMERGENCE_PROBABILITY
-        self.spatial_grid = SpatialGrid(width, height, cell_size=max(config.STUDENT_RADIUS, config.ADULT_RADIUS) * 4) # Adjust cell size maybe?
+        self.spatial_grid = SpatialGrid(width, height, cell_size=max(config.STUDENT_RADIUS, config.ADULT_RADIUS) * 4)
 
         self.shooter_appeared_flag = False
         self.first_shooter_appearance_time = 0.0
@@ -142,30 +139,37 @@ class SchoolModel:
         self.dead_student_count = 0
         self.dead_adult_count = 0
         self.escaped_student_count = 0
-        # Optional: for throttling data collection if needed
-        # self.last_data_collect_time = -1.0
-        # self.data_collect_interval = 0.5 # Collect data every 0.5 simulated seconds
         # ----------------------------------
 
-        # Load walls from grid file or use default configuration
+        # --- Wall and Exit Loading ---
+        self.walls = []  # Now list of pygame.Rect
+        self.exits = []  # List of pygame.Rect for exits
+
         if grid_file and os.path.exists(grid_file):
-            print(f"Loading walls from grid file: {grid_file}")
-            self.walls = integrate_grid_into_simulation(grid_file, width, height)
-            print(f"Loaded {len(self.walls)} wall segments from grid file")
+            print(f"Loading walls and exits from grid file: {grid_file}")
+            # integrate_grid_into_simulation now returns (walls, exits)
+            loaded_walls, loaded_exits = integrate_grid_into_simulation(grid_file, width, height)
+            self.walls = loaded_walls # walls are now pygame.Rect
+            self.exits = loaded_exits
+            print(f"Loaded {len(self.walls)} wall rects and {len(self.exits)} exit rects.")
+            if not self.exits:
+                print("Warning: No exits defined in the grid file!")
         else:
-            print("Using default wall configuration")
-            # Example default walls - replace with your actual defaults if needed
-            self.walls = [
-                 (0, 0, width, 1), (0, height - 1, width, height), # Top/Bottom outer
-                 (0, 0, 1, height), (width - 1, 0, width, height), # Left/Right outer
-                 # Add internal walls here if using defaults
-             ]
+            print("Warning: Grid file not found or not specified. Using default empty walls/exits.")
+            # Define default walls/exits if needed, otherwise they remain empty lists
+            # Example default: add outer boundary walls as Rects
+            wall_thickness = 5 # Example thickness
+            self.walls.append(pygame.Rect(0, 0, width, wall_thickness)) # Top
+            self.walls.append(pygame.Rect(0, height - wall_thickness, width, wall_thickness)) # Bottom
+            self.walls.append(pygame.Rect(0, 0, wall_thickness, height)) # Left
+            self.walls.append(pygame.Rect(width - wall_thickness, 0, wall_thickness, height)) # Right
+            # Define a default exit if desired when no grid file is used
+            # self.exits.append(pygame.Rect(width * 0.8, 0, width * 0.1, 10)) # Example top-right exit
 
-        # --- ADDED: Create pygame.Rect versions of walls for pathfinding ---
-        self.wall_rects = [pygame.Rect(x1, y1, x2 - x1, y2 - y1) for (x1, y1, x2, y2) in self.walls]
-        # -----------------------------------------------------------------
+        # --- Pass wall Rects to A* ---
+        # The a_star implementation expects pygame.Rect objects, which self.walls now contains.
+        self.wall_rects = self.walls # Direct assignment is sufficient
 
-        # Removed self._create_wall_grid() call if it was only for optimization (LoS uses direct check)
         self._create_all_agents()
 
     # In the _create_all_agents method of SchoolModel, ensure adults with weapons are properly configured:
@@ -307,7 +311,10 @@ class SchoolModel:
     def should_terminate(self):
         """Property om aan te geven of de simulatie moet stoppen."""
         return self.terminate_simulation
-
+    
+    @property
+    def exit_rects(self):
+        return self.exits
 
     def add_students(self, count):
         """Add a specified number of students to the simulation."""
@@ -325,82 +332,50 @@ class SchoolModel:
             self.schedule.append(agent)
             self.spatial_grid.update_agent(agent)
 
+    # Ensure generate_safe_position is updated if necessary
     def generate_safe_position(self, min_wall_distance=5.0, max_attempts=100):
-        """
-        Generate a random position that's not inside or too close to a wall.
+         """
+         Generate a random position that's not too close to a wall Rect.
+         """
+         padding = max(5.0, min_wall_distance)
 
-        Args:
-            min_wall_distance: Minimum distance from any wall
-            max_attempts: Maximum number of attempts before giving up
+         for _ in range(max_attempts):
+             x = random.uniform(padding, self.width - padding)
+             y = random.uniform(padding, self.height - padding)
 
-        Returns:
-            Tuple (x, y) of the safe position
-        """
-        padding = max(5.0, min_wall_distance)  # Minimum padding from walls
+             if self.is_position_safe((x, y), min_wall_distance):
+                 return (x, y)
 
-        for _ in range(max_attempts):
-            # Generate random position with padding from edges
-            x = random.uniform(padding, self.width - padding)
-            y = random.uniform(padding, self.height - padding)
+         print("Warning: Could not find ideal safe position after", max_attempts, "attempts")
+         return self.find_safest_position(padding) # Fallback
 
-            # Check if position is safe (not too close to any wall)
-            if self.is_position_safe((x, y), min_wall_distance):
-                return (x, y)
-
-        # If we can't find a safe position after max attempts, find the safest available
-        print("Warning: Could not find ideal safe position after", max_attempts, "attempts")
-        return self.find_safest_position(padding)
-
+      # --- Modify generate_safe_position and is_position_safe to use pygame.Rect ---
     def is_position_safe(self, position, min_wall_distance=5.0):
         """
-        Check if a position is at a safe distance from all walls.
-
-        Args:
-            position: Tuple (x, y) to check
-            min_wall_distance: Minimum distance from any wall
-
-        Returns:
-            True if position is safe, False otherwise
+        Check if a position is at a safe distance from all wall Rects.
         """
         x, y = position
+        agent_radius = min_wall_distance # Use min_wall_distance as effective radius check
 
-        # First quick check - are we inside any wall?
-        for wall in self.walls:
-            wall_x1, wall_y1, wall_x2, wall_y2 = wall
-            if (wall_x1 <= x <= wall_x2 and wall_y1 <= y <= wall_y2):
-                return False  # Inside a wall
+        for wall_rect in self.walls:
+            # Check collision using inflate to account for distance
+            # Inflate creates a larger rect; if point is inside inflated rect, it's too close
+            inflated_wall = wall_rect.inflate(agent_radius * 2, agent_radius * 2)
+            if inflated_wall.collidepoint(x, y):
+                 return False # Too close to this wall
 
-        # Then check distance to each wall
-        for wall in self.walls:
-            wall_x1, wall_y1, wall_x2, wall_y2 = wall
-
-            # Calculate the closest point on the wall
-            closest_x = max(wall_x1, min(x, wall_x2))
-            closest_y = max(wall_y1, min(y, wall_y2))
-
-            # Calculate distance to the closest point
-            dx = x - closest_x
-            dy = y - closest_y
-            distance = math.sqrt(dx * dx + dy * dy)
-
-            if distance < min_wall_distance:
-                return False  # Too close to a wall
+            # Also check if point is exactly inside the original wall
+            if wall_rect.collidepoint(x,y):
+                 return False # Inside the wall exactly
 
         return True
 
+    # In find_safest_position, update the wall check:
     def find_safest_position(self, padding):
         """
-        Find the position with maximum distance to any wall.
-        Used as a fallback when generate_safe_position fails.
-
-        Args:
-            padding: Minimum padding from edges
-
-        Returns:
-            Tuple (x, y) of the safest position
+        Find the position with maximum distance to any wall Rect.
         """
-        # Create a grid of candidate positions
-        grid_size = 20  # 20x20 grid
+        grid_size = 20
         candidates = []
 
         for i in range(grid_size):
@@ -408,41 +383,32 @@ class SchoolModel:
                 x = padding + (self.width - 2 * padding) * i / (grid_size - 1)
                 y = padding + (self.height - 2 * padding) * j / (grid_size - 1)
 
-                # Calculate minimum distance to any wall
                 min_distance = float('inf')
                 inside_wall = False
 
-                for wall in self.walls:
-                    wall_x1, wall_y1, wall_x2, wall_y2 = wall
-
-                    # Check if inside wall
-                    if (wall_x1 <= x <= wall_x2 and wall_y1 <= y <= wall_y2):
+                for wall_rect in self.walls:
+                    if wall_rect.collidepoint(x, y):
                         inside_wall = True
-                        break
+                        break # Skip if inside wall
 
-                    closest_x = max(wall_x1, min(x, wall_x2))
-                    closest_y = max(wall_y1, min(y, wall_y2))
-
-                    dx = x - closest_x
-                    dy = y - closest_y
-                    distance = math.sqrt(dx * dx + dy * dy)
-
+                    # Calculate distance to closest point on Rect boundary
+                    clamped_x = max(wall_rect.left, min(x, wall_rect.right))
+                    clamped_y = max(wall_rect.top, min(y, wall_rect.bottom))
+                    dx = x - clamped_x
+                    dy = y - clamped_y
+                    distance = math.hypot(dx, dy)
                     min_distance = min(min_distance, distance)
 
-                # Inside a wall? Skip
                 if inside_wall:
                     continue
 
                 candidates.append((x, y, min_distance))
 
-        # Sort by distance (largest first)
-        candidates.sort(key=lambda c: -c[2])
-
-        # Return the position with the maximum distance, or a default if no candidates
         if candidates:
+            candidates.sort(key=lambda c: -c[2])
             return (candidates[0][0], candidates[0][1])
         else:
-            print("Warning: No safe position found, using center of the space.")
+            print("Warning: No safe position found, using center.")
             return (self.width / 2, self.height / 2)
 
     def remove_agent(self, agent, reason="died"):
@@ -458,9 +424,9 @@ class SchoolModel:
                 elif agent.agent_type == "adult":
                     self.dead_adult_count += 1
             elif reason == "escaped":
+                 # Only count students escaping for now
                 if agent.agent_type == "student":
                      self.escaped_student_count += 1
-                # Adults typically don't "escape" in the same way, but could add if needed
 
             # Remove from active shooters set if necessary
             if agent in self.active_shooters:
@@ -469,7 +435,7 @@ class SchoolModel:
 
             # Remove from spatial grid and schedule
             self.spatial_grid.remove_agent(agent)
-            self.schedule.remove(agent)
+            self.schedule.remove(agent) # Remove from the main list
 
 
     def collect_step_data(self):

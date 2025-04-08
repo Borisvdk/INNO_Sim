@@ -80,5 +80,3 @@ try:
 except Exception as e:
     print(f"Error saving grid.json: {e}")
 
-# You can also print the string to verify
-# print(json_string)

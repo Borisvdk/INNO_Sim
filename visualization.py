@@ -9,57 +9,45 @@ class Visualizer:
     """Class to handle all visualization aspects of the simulation."""
 
     def __init__(self, model, screen_width=config.SCREEN_WIDTH, screen_height=config.SCREEN_HEIGHT):
+        # ... (init remains mostly the same) ...
         self.model = model
         self.screen_width = screen_width
         self.screen_height = screen_height
-        self.scale_factor = min(screen_width / model.width, screen_height / model.height)
+        self.scale_factor = min(screen_width / model.width, screen_height / model.height) # Keep scale factor for agent size/pos
 
-        # Initialize Pygame components
         self.screen = pygame.display.set_mode((screen_width, screen_height))
         pygame.display.set_caption("School Safety Simulation")
-
-        # Use colors from config
         self.COLORS = config.COLORS
-
-        # Create a cached background with walls
         self.background = pygame.Surface((screen_width, screen_height))
         self.background.fill(self.COLORS["WHITE"])
 
-        # Draw walls on background
-        for wall in model.walls:
-            x_min, y_min, x_max, y_max = wall
-            pygame.draw.rect(
-                self.background,
-                self.COLORS["BLACK"],
-                pygame.Rect(
-                    x_min * self.scale_factor,
-                    y_min * self.scale_factor,
-                    (x_max - x_min) * self.scale_factor,
-                    (y_max - y_min) * self.scale_factor
-                )
-            )
+        # --- Draw walls (which are now Rects) on background ---
+        for wall_rect in model.walls:
+             # Scale the Rect for drawing
+             scaled_rect = pygame.Rect(
+                 wall_rect.left * self.scale_factor,
+                 wall_rect.top * self.scale_factor,
+                 wall_rect.width * self.scale_factor,
+                 wall_rect.height * self.scale_factor
+             )
+             pygame.draw.rect(self.background, self.COLORS["BLACK"], scaled_rect)
+        # -----------------------------------------------------
 
-        # Create font for UI text
         self.font = pygame.font.SysFont(None, 24)
         self.alert_font = pygame.font.SysFont(None, 36)
-
-        # Pre-render help text, now including the X key for manual shooter
+        # ... (rest of init: help text, alert vars) ...
         self.help_text = self.font.render(
             "↑/↓: Speed up/down | Space: Reset speed | S: Add students | A: Add adults | E: Emergency evacuation | X: Add shooter",
             True, self.COLORS["BLACK"]
         )
-
-        # Add visualization controls description
         self.viz_help_text = self.font.render(
             "V: Toggle Line of Sight | B: Toggle Safe Areas",
             True, self.COLORS["BLACK"]
         )
-
-        # Alert system variables
         self.show_alert = False
         self.alert_message = ""
         self.alert_start_time = 0
-        self.alert_duration = config.ALERT_DURATION  # seconds
+        self.alert_duration = config.ALERT_DURATION
         self.last_has_shooter = False
 
     def check_shooter_status(self):
@@ -309,34 +297,22 @@ class Visualizer:
         return None
 
     def visualize_safe_spawn_areas(self):
-        """Visualize the areas where agents can safely spawn (not in walls)."""
-        # Create a temporary surface for drawing with alpha
-        temp_surface = pygame.Surface((self.screen.get_width(), self.screen.get_height()), pygame.SRCALPHA)
+         """Visualize the areas where agents can safely spawn (not in wall Rects)."""
+         temp_surface = pygame.Surface((self.screen.get_width(), self.screen.get_height()), pygame.SRCALPHA)
+         grid_step = 10
 
-        # Sample a grid of points and check if they're in a wall
-        grid_step = 10  # Controls the density of sampling points
+         for x in range(0, self.model.width, grid_step):
+             for y in range(0, self.model.height, grid_step):
+                 # Check if point collides with any wall Rect
+                 is_in_wall = any(wall_rect.collidepoint(x, y) for wall_rect in self.model.walls)
 
-        for x in range(0, self.model.width, grid_step):
-            for y in range(0, self.model.height, grid_step):
-                # Check if position is inside any wall
-                is_in_wall = False
-                for wall in self.model.walls:
-                    wall_x1, wall_y1, wall_x2, wall_y2 = wall
-                    if (wall_x1 <= x <= wall_x2 and wall_y1 <= y <= wall_y2):
-                        is_in_wall = True
-                        break
+                 screen_x = int(x * self.scale_factor)
+                 screen_y = int(y * self.scale_factor)
+                 color = (255, 0, 0, 100) if is_in_wall else (0, 255, 0, 40)
+                 radius = 3
+                 pygame.draw.circle(temp_surface, color, (screen_x, screen_y), radius)
 
-                # Convert to screen coordinates
-                screen_x = int(x * self.scale_factor)
-                screen_y = int(y * self.scale_factor)
-
-                # Draw a dot
-                color = (255, 0, 0, 100) if is_in_wall else (0, 255, 0, 40)  # Red for unsafe, green for safe
-                radius = 3
-                pygame.draw.circle(temp_surface, color, (screen_x, screen_y), radius)
-
-        # Draw the surface
-        self.screen.blit(temp_surface, (0, 0))
+         self.screen.blit(temp_surface, (0, 0))
 
     def draw_alert(self):
         """Draw an alert message on the screen"""
@@ -403,110 +379,106 @@ class Visualizer:
         if show_safe_areas:
             self.visualize_safe_spawn_areas()
 
-        # Pre-calculate draw lists for batch rendering
+        # --- Draw Exits (Green Rects) ---
+        exit_color = (0, 255, 0, 150) # Semi-transparent green
+        for exit_rect in self.model.exits:
+             # Scale the Rect for drawing
+             scaled_rect = pygame.Rect(
+                 exit_rect.left * self.scale_factor,
+                 exit_rect.top * self.scale_factor,
+                 exit_rect.width * self.scale_factor,
+                 exit_rect.height * self.scale_factor
+             )
+             # Draw filled rectangle for exit area
+             pygame.draw.rect(self.screen, exit_color, scaled_rect)
+             # Optionally draw a border
+             pygame.draw.rect(self.screen, (0, 100, 0), scaled_rect, 1) # Darker green border
+        # ----------------------------------
+
+        # Pre-calculate draw lists for batch rendering agents
         circles_to_draw = []
         lines_to_draw = []
-
+        # ... (Agent drawing logic remains the same) ...
         for agent in self.model.schedule:
             x, y = agent.position
             screen_x = int(x * self.scale_factor)
             screen_y = int(y * self.scale_factor)
-            scaled_radius = int(agent.radius * self.scale_factor)
+            scaled_radius = max(1, int(agent.radius * self.scale_factor)) # Ensure radius is at least 1
 
+            # Determine agent color based on type and status
             if agent.agent_type == "student":
-                if getattr(agent, "is_shooter", False):
-                    color = self.COLORS["GREEN"]  # Schutter-studenten
-                elif getattr(agent, "has_weapon", False):
-                    color = self.COLORS["ARMED_STUDENT"]  # Gewapende studenten (zoals eerder ingesteld)
-                else:
-                    color = self.COLORS["BLUE"]  # Normale studenten
-            else:  # adult
-                if getattr(agent, "has_weapon", False):
-                    color = (255, 255, 0)  # Geel voor gewapende volwassenen
-                else:
-                    color = self.COLORS["RED"]  # Normale volwassenen (bijv. rood)
+                 if getattr(agent, "is_shooter", False): color = self.COLORS["GREEN"]
+                 elif getattr(agent, "has_weapon", False): color = self.COLORS["ARMED_STUDENT"]
+                 elif getattr(agent, "in_emergency", False): color = (0, 100, 255) # Darker blue for fleeing students
+                 else: color = self.COLORS["BLUE"]
+            else: # adult
+                 if getattr(agent, "has_weapon", False): color = (255, 255, 0) # Yellow for armed adults
+                 elif getattr(agent, "aware_of_shooter", False): color = (255,100,0) # Orange for aware adults
+                 else: color = self.COLORS["RED"]
 
-            # Add circle to draw list
             circles_to_draw.append((color, (screen_x, screen_y), scaled_radius))
 
-            # Add direction line to draw list if moving
+            # Direction line
             if hasattr(agent, "velocity"):
                 vx, vy = agent.velocity
-                speed_squared = vx * vx + vy * vy
-                if speed_squared > 0.01:  # Only draw if moving at significant speed
-                    speed = math.sqrt(speed_squared)
-                    direction_x = vx / speed * (scaled_radius + 2)
-                    direction_y = vy / speed * (scaled_radius + 2)
-                    lines_to_draw.append(
-                        (self.COLORS["BLACK"], (screen_x, screen_y),
-                        (screen_x + direction_x, screen_y + direction_y), 1)
-                    )
-
-        # Draw all circles in batch
-        for color, pos, radius in circles_to_draw:
-            pygame.draw.circle(self.screen, color, pos, radius)
-
-        # Draw all lines in batch
-        for color, start, end, width in lines_to_draw:
-            pygame.draw.line(self.screen, color, start, end, width)
-
-        # 🔥 Draw Exit Lines (Green)
-        line_thickness = 5  # Adjust thickness if needed
-
-        # Draw the single school exit
-        exit_color = (0, 255, 0)  # Green
-        pygame.draw.line(self.screen, exit_color, (500 * 2, 20 * 2), (580 * 2, 20 * 2), 5)  # School exit line
+                speed_squared = vx*vx + vy*vy
+                if speed_squared > 0.01:
+                     speed = math.sqrt(speed_squared)
+                     # Prevent division by zero if speed is somehow exactly zero after check
+                     if speed > 0:
+                          direction_x = vx / speed * (scaled_radius + 2)
+                          direction_y = vy / speed * (scaled_radius + 2)
+                          lines_to_draw.append(
+                              (self.COLORS["BLACK"], (screen_x, screen_y),
+                              (int(screen_x + direction_x), int(screen_y + direction_y)), 1) # Cast end points to int
+                          )
 
 
-        # Visualize line of sight if enabled
+        # Draw all circles and lines
+        for color, pos, radius in circles_to_draw: pygame.draw.circle(self.screen, color, pos, radius)
+        for color, start, end, width in lines_to_draw: pygame.draw.line(self.screen, color, start, end, width)
+
+        # --- REMOVE old hardcoded exit line drawing ---
+        # pygame.draw.line(self.screen, (0, 255, 0), (500 * 2, 20 * 2), (580 * 2, 20 * 2), 5) # REMOVED
+
+        # Visualize line of sight / vision cone if enabled
         if show_line_of_sight:
-            self.visualize_vision_cone()
+            # Choose one visualization method or combine carefully
+            # self.visualize_line_of_sight() # Shows lines to all agents
+            self.visualize_vision_cone() # Shows cone based on direction/target
 
-        # Process and draw active shots efficiently
+        # Process and draw active shots
+        # ... (Shot drawing logic remains the same) ...
         shot_duration = config.SHOT_VISUALIZATION_DURATION
         shots_to_remove = []
         current_sim_time = self.model.simulation_time
-
         for i, shot in enumerate(self.model.active_shots):
-            if current_sim_time - shot['start_time'] < shot_duration:
-                # Scale shot coordinates
-                start_x, start_y = shot['start_pos']
-                end_x, end_y = shot['end_pos']
-                screen_start = (int(start_x * self.scale_factor), int(start_y * self.scale_factor))
-                screen_end = (int(end_x * self.scale_factor), int(end_y * self.scale_factor))
-                pygame.draw.line(self.screen, (255, 0, 0), screen_start, screen_end, 2)
-            else:
-                shots_to_remove.append(i)
-
-        # Remove expired shots - start from highest index to avoid shifting issues
+             if current_sim_time - shot['start_time'] < shot_duration:
+                 start_x, start_y = shot['start_pos']
+                 end_x, end_y = shot['end_pos']
+                 screen_start = (int(start_x * self.scale_factor), int(start_y * self.scale_factor))
+                 screen_end = (int(end_x * self.scale_factor), int(end_y * self.scale_factor))
+                 pygame.draw.line(self.screen, (255, 0, 0), screen_start, screen_end, 2)
+             else: shots_to_remove.append(i)
         for i in sorted(shots_to_remove, reverse=True):
-            if i < len(self.model.active_shots):
-                self.model.active_shots.pop(i)
+             if i < len(self.model.active_shots): self.model.active_shots.pop(i)
 
-        # Count agents for display
+
+        # Draw UI text
+        # ... (UI text drawing remains the same) ...
         student_count = sum(1 for agent in self.model.schedule if agent.agent_type == "student")
         adult_count = sum(1 for agent in self.model.schedule if agent.agent_type == "adult")
-        shooter_count = sum(1 for agent in self.model.schedule if hasattr(agent, "is_shooter") and agent.is_shooter)
-
-        # Render dynamic UI text
+        shooter_count = len(self.model.active_shooters) # Use the set length
         time_text = self.font.render(f"Sim Time: {simulation_time:.1f}s", True, self.COLORS["BLACK"])
         speed_text = self.font.render(f"Speed: {sim_speed:.1f}x", True, self.COLORS["BLACK"])
         count_text = self.font.render(f"Students: {student_count}, Adults: {adult_count}", True, self.COLORS["BLACK"])
         fps_text = self.font.render(f"FPS: {fps:.1f}", True, self.COLORS["BLACK"])
-
-        # Show shooter count
         shooter_text_color = self.COLORS["ALERT"] if shooter_count > 0 else self.COLORS["BLACK"]
         shooter_text = self.font.render(f"Active Shooters: {shooter_count}", True, shooter_text_color)
-
-        # Visualization status text
         los_status = "ON" if show_line_of_sight else "OFF"
         safe_status = "ON" if show_safe_areas else "OFF"
-        viz_status_text = self.font.render(
-            f"Line of Sight: {los_status} | Safe Areas: {safe_status}",
-            True, self.COLORS["BLACK"]
-        )
+        viz_status_text = self.font.render(f"Vision Cone: {los_status} | Safe Areas: {safe_status}", True, self.COLORS["BLACK"]) # Updated text
 
-        # Draw UI text
         self.screen.blit(time_text, (10, 10))
         self.screen.blit(speed_text, (10, 40))
         self.screen.blit(count_text, (10, 70))
