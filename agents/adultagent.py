@@ -56,6 +56,20 @@ class AdultAgent(SchoolAgent):
 
                 # Active shooter response
                 self._shooter_response(dt, current_time)
+        # If aware but not armed, notify other about the shooter
+        elif self.aware_of_shooter and not self.has_weapon:
+            # Notify other adults about the shooter
+            if not self.has_alerted_others:
+                self._alert_nearby_adults()
+                self.has_alerted_others = True
+                print(f"Adult {self.unique_id} alerted others about shooter")
+
+            # Move away from the shooter
+            self.target_speed = self.max_speed * 0.5  # Move cautiously
+            super().move_continuous(dt)  # Call parent move function
+        elif self.aware_of_shooter and current_time - self.awareness_time < self.response_delay:
+            # Wait for response delay to pass before acting
+            pass
         else:
             # Regular movement if not responding to shooter
             super().move_continuous(dt)
