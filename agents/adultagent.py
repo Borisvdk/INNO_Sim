@@ -278,7 +278,7 @@ class AdultAgent(SchoolAgent):
             if target in self.model.active_shooters:
                 self.model.active_shooters.remove(target)
 
-            self.model.remove_agent(target)
+            self.model.remove_agent(target, reason="died")
         else:
             print(f"Adult {self.unique_id} missed shot at shooter {self.locked_target.unique_id}")
 

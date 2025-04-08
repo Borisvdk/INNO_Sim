@@ -156,9 +156,13 @@ class StudentAgent(SchoolAgent):
             if self.in_emergency:
                 # --- Fleeing Movement Logic ---
                 # 1. Check exit collision
-                if school_exit.collidepoint(self.position):
-                    self.model.remove_agent(self)
-                    return  # Agent removed
+                # Use a slightly larger check area or check based on radius
+                agent_center_x, agent_center_y = self.position
+                if school_exit.collidepoint(agent_center_x, agent_center_y):
+                    # Check if center is within the exit rectangle
+                    print(f"Student {self.unique_id} reached the exit!")
+                    self.model.remove_agent(self, reason="escaped") # Use the reason parameter
+                    return # Agent removed, stop processing this agent
 
                 # 2. Follow path if available
                 if self.path:
@@ -522,7 +526,7 @@ class StudentAgent(SchoolAgent):
             target_to_remove = target
             if self.locked_target == target_to_remove:
                 self.locked_target = None  # Unlock before removing
-            self.model.remove_agent(target_to_remove)  # Critical: Remove target
+            self.model.remove_agent(target_to_remove, reason="died")  # Critical: Remove target
 
         else:
             # print(f"Shooter {self.unique_id} missed") # Reduce miss noise

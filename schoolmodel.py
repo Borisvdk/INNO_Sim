@@ -5,6 +5,7 @@ from grid_converter import integrate_grid_into_simulation
 import config
 import pygame # Ensure pygame is imported
 from a_star import astar
+import time
 
 
 class AgentFactory:
@@ -134,6 +135,17 @@ class SchoolModel:
         self.shooter_appeared_flag = False
         self.first_shooter_appearance_time = 0.0
         self.terminate_simulation = False
+
+        # --- Data Collection Attributes ---
+        self.initial_student_count = n_students
+        self.initial_adult_count = n_adults
+        self.dead_student_count = 0
+        self.dead_adult_count = 0
+        self.escaped_student_count = 0
+        # Optional: for throttling data collection if needed
+        # self.last_data_collect_time = -1.0
+        # self.data_collect_interval = 0.5 # Collect data every 0.5 simulated seconds
+        # ----------------------------------
 
         # Load walls from grid file or use default configuration
         if grid_file and os.path.exists(grid_file):
@@ -433,11 +445,84 @@ class SchoolModel:
             print("Warning: No safe position found, using center of the space.")
             return (self.width / 2, self.height / 2)
 
-    def remove_agent(self, agent):
-        """Remove an agent from the simulation."""
+    def remove_agent(self, agent, reason="died"):
+        """
+        Remove an agent from the simulation and update counts based on reason.
+        Reason can be 'died' or 'escaped'.
+        """
         if agent in self.schedule:
+            # Update counts based on reason *before* removing
+            if reason == "died":
+                if agent.agent_type == "student":
+                    self.dead_student_count += 1
+                elif agent.agent_type == "adult":
+                    self.dead_adult_count += 1
+            elif reason == "escaped":
+                if agent.agent_type == "student":
+                     self.escaped_student_count += 1
+                # Adults typically don't "escape" in the same way, but could add if needed
+
+            # Remove from active shooters set if necessary
             if agent in self.active_shooters:
                 self.active_shooters.remove(agent)
-                print(f"Shooter {agent.unique_id} has been removed. Active shooters left: {len(self.active_shooters)}")
+                print(f"Shooter {agent.unique_id} removed ({reason}). Active shooters left: {len(self.active_shooters)}")
+
+            # Remove from spatial grid and schedule
             self.spatial_grid.remove_agent(agent)
             self.schedule.remove(agent)
+
+
+    def collect_step_data(self):
+        """Collects statistics for the current simulation step."""
+        # --- Optional Throttling ---
+        # current_time = self.simulation_time
+        # if current_time - self.last_data_collect_time < self.data_collect_interval:
+        #     return None # Don't collect data yet
+        # self.last_data_collect_time = current_time
+        # ---------------------------
+
+        living_students = 0
+        living_adults = 0
+        living_armed_adults = 0
+        living_unarmed_adults = 0
+        living_shooters = 0 # Count shooters currently in schedule
+
+        for agent in self.schedule:
+            if agent.agent_type == "student":
+                living_students += 1
+                if getattr(agent, 'is_shooter', False):
+                    living_shooters += 1
+            elif agent.agent_type == "adult":
+                living_adults += 1
+                if getattr(agent, 'has_weapon', False):
+                    living_armed_adults += 1
+                else:
+                    living_unarmed_adults += 1
+                # Optional: Count adult shooters if adults can become shooters
+                # if getattr(agent, 'is_shooter', False):
+                #    living_shooters += 1 # Add if needed
+
+        # Sanity check: ensure living shooters count matches active_shooters set
+        # It might differ slightly if an agent is removed mid-step *after* counting
+        # Using len(self.active_shooters) is likely more accurate for *current* state.
+        living_shooters = len(self.active_shooters)
+
+        # Total deaths are tracked directly
+        total_dead_students = self.dead_student_count
+        total_dead_adults = self.dead_adult_count
+
+        # Total escaped students are tracked directly
+        total_escaped_students = self.escaped_student_count
+
+        data = {
+            "Time": round(self.simulation_time, 2), # Round time for cleaner output
+            "Living Students": living_students,
+            "Living Adults": living_adults,
+            "Living Armed Adults": living_armed_adults,
+            "Living Unarmed Adults": living_unarmed_adults,
+            "Living Shooters": living_shooters,
+            "Dead Students": total_dead_students,
+            "Dead Adults": total_dead_adults,
+            "Escaped Students": total_escaped_students
+        }
+        return data
