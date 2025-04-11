@@ -11,12 +11,12 @@ SIM_HEIGHT = 400
 SCREEN_WIDTH = 1200
 SCREEN_HEIGHT = 800
 FPS_LIMIT = 60
-NUM_VISUAL_BATCH_RUNS = 2
+NUM_VISUAL_BATCH_RUNS = 1
 
 
 # Agent counts
-INITIAL_STUDENTS = 100
-INITIAL_ADULTS = 20
+INITIAL_STUDENTS = 52
+INITIAL_ADULTS = 3
 
 # Weapon odds
 ADULT_WEAPON_PROBABILITY = 0.5
@@ -78,7 +78,9 @@ COLORS = {
     "GREEN": (0, 255, 0),  # Shooter
     "ARMED_STUDENT": (100, 100, 255),
     "ARMED_ADULT": (255, 100, 100),
-    "ALERT": (255, 0, 0)
+    "ALERT": (255, 0, 0),
+    "SCREAM_FILL": (255, 165, 0, 50),   # Semi-transparent Orange fill
+    "SCREAM_OUTLINE": (255, 140, 0, 100) # Darker Orange outline
 }
 
 # Key mappings (pygame key constants will be used in code)

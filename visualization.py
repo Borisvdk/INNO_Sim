@@ -20,10 +20,10 @@ class Visualizer:
         self.screen = pygame.display.set_mode((screen_width, screen_height))
         pygame.display.set_caption("School Safety Simulation")
 
-        # Use colors from config, and add door color if not present
+        # Use colors from config, including new scream colors
         self.COLORS = config.COLORS
-        if "BROWN" not in self.COLORS: # Add a default door color if needed
-             self.COLORS["BROWN"] = (139, 69, 19) # Saddle Brown
+        # Ensure default door color if brown isn't defined (though it is now in config)
+        if "BROWN" not in self.COLORS: self.COLORS["BROWN"] = (139, 69, 19)
 
         # Create a cached background with walls and doors
         self.background = pygame.Surface((screen_width, screen_height))
@@ -263,6 +263,10 @@ class Visualizer:
              pygame.draw.rect(self.screen, exit_border_color, scaled_rect, 1)
         # ----------------------------------
 
+        # --- Create Overlay Surface for Transparent Elements ---
+        overlay_surface = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
+        # ------------------------------------------------------
+
         # Pre-calculate agent draw lists
         circles_to_draw = []
         lines_to_draw = []
@@ -300,7 +304,23 @@ class Visualizer:
                               (int(screen_x + direction_x), int(screen_y + direction_y)), 1)
                           )
 
-        # Draw agents and direction lines
+            # --- Draw Scream Radius on Overlay ---
+            if agent.agent_type == "student" and getattr(agent, "in_emergency", False):
+                scaled_scream_radius = int(config.SCREAM_RADIUS * self.scale_factor)
+                if scaled_scream_radius > 0: # Only draw if radius is visible
+                    # Draw filled circle on overlay
+                    pygame.draw.circle(overlay_surface, self.COLORS["SCREAM_FILL"],
+                                       (screen_x, screen_y), scaled_scream_radius)
+                    # Draw outline circle on overlay
+                    pygame.draw.circle(overlay_surface, self.COLORS["SCREAM_OUTLINE"],
+                                       (screen_x, screen_y), scaled_scream_radius, 1) # Width 1 for outline
+            # -------------------------------------
+
+        # --- Blit the Overlay Surface (with scream circles) onto the main screen ---
+        self.screen.blit(overlay_surface, (0, 0))
+        # --------------------------------------------------------------------------
+
+        # Draw agents and direction lines (on top of overlay)
         for color, pos, radius in circles_to_draw: pygame.draw.circle(self.screen, color, pos, radius)
         for color, start, end, width in lines_to_draw: pygame.draw.line(self.screen, color, start, end, width)
 
