@@ -305,7 +305,7 @@ class Visualizer:
                           )
 
             # --- Draw Scream Radius on Overlay ---
-            if agent.agent_type == "student" and getattr(agent, "in_emergency", False):
+            if config.ENABLE_STUDENT_SCREAMING and agent.agent_type == "student" and getattr(agent, "in_emergency", False):
                 scaled_scream_radius = int(config.SCREAM_RADIUS * self.scale_factor)
                 if scaled_scream_radius > 0: # Only draw if radius is visible
                     # Draw filled circle on overlay

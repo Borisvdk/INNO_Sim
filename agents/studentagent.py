@@ -86,21 +86,25 @@ class StudentAgent(SchoolAgent):
                                  break
 
                 # --- 1b. Check for nearby SCREAMING students (if not already triggered by shooter) ---
-                if not self.in_emergency:
-                    # ... (scream detection logic remains the same) ...
-                    check_radius = config.SCREAM_RADIUS + self.radius
+                if config.ENABLE_STUDENT_SCREAMING and not self.in_emergency:
+                    check_radius = config.SCREAM_RADIUS # Use config value directly
                     nearby_agents = self.model.spatial_grid.get_nearby_agents(self.position, check_radius)
                     scream_radius_sq = config.SCREAM_RADIUS ** 2
                     for agent in nearby_agents:
-                         if agent != self and isinstance(agent, StudentAgent) and agent.in_emergency:
-                             dx = agent.position[0] - self.position[0]
-                             dy = agent.position[1] - self.position[1]
-                             dist_squared = dx * dx + dy * dy
-                             if dist_squared < scream_radius_sq:
+                         # Check if agent is another student, in emergency, and within squared radius
+                         if (agent != self and
+                             agent in self.model.schedule and # Ensure agent still exists
+                             isinstance(agent, StudentAgent) and
+                             agent.in_emergency):
+
+                             dist_squared_scream = distance_squared(self.position, agent.position)
+                             if dist_squared_scream < scream_radius_sq:
+                                 # Optional: Add line of sight check for screams too?
+                                 # if self.has_line_of_sight(agent.position):
                                  print(f"Student {self.unique_id} heard scream from student {agent.unique_id}! Entering emergency.")
                                  self.in_emergency = True
                                  triggered_emergency_this_step = True
-                                 break
+                                 break # Stop checking screamers once aware
 
             # --- 1c. Calculate Path (if emergency was triggered this step) ---
             if triggered_emergency_this_step:
