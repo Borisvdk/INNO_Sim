@@ -1,97 +1,109 @@
-# --- START OF FILE config.py ---
-
 """
 Configuration file for the school safety simulation.
 All important simulation parameters are defined here.
 """
 
-# Basic simulation parameters
-SIM_WIDTH = 600
-SIM_HEIGHT = 400
-SCREEN_WIDTH = 1200
-SCREEN_HEIGHT = 800
-FPS_LIMIT = 60
-NUM_VISUAL_BATCH_RUNS = 1
+# --- Simulation Environment ---
+SIM_WIDTH = 600                     # Logical width of the simulation area
+SIM_HEIGHT = 400                    # Logical height of the simulation area
+GRID_FILE = "grid.json"             # File defining walls, doors, exits
 
+# --- Display Settings ---
+SCREEN_WIDTH = 1200                 # Width of the display window in pixels
+SCREEN_HEIGHT = 800                 # Height of the display window in pixels
+FPS_LIMIT = 60                      # Target frame rate for visualization
+FPS_SAMPLE_COUNT = 30               # Number of frames to average for FPS display
 
-# Agent counts
-INITIAL_STUDENTS = 52
-INITIAL_ADULTS = 3
+# --- Simulation Control ---
+NUM_VISUAL_BATCH_RUNS = 1           # Default number of simulations to run sequentially
+TERMINATION_DELAY_AFTER_SHOOTER = 60.0 # Seconds after last shooter is neutralized to end sim
+PAUSE_ON_TERMINATION = 1.5          # Seconds to pause visualization when simulation ends
+PAUSE_BETWEEN_RUNS = 2.0            # Seconds to pause between sequential simulation runs
 
-# Weapon odds
-ADULT_WEAPON_PROBABILITY = 0.5
+# --- Agent Initialization ---
+INITIAL_STUDENTS = 50               # Starting number of students
+INITIAL_ADULTS = 5                  # Starting number of adults
 
-# Simulation termination time
-TERMINATION_DELAY_AFTER_SHOOTER = 50.0
+# --- Agent Spawning (Manual) ---
+ADD_STUDENT_INCREMENT = 10          # Number of students to add with 'S' key
+ADD_ADULT_INCREMENT = 5             # Number of adults to add with 'A' key
 
-# Agent physical properties
-STUDENT_RADIUS = 3.0
-ADULT_RADIUS = 4.0
-STUDENT_MASS = 1.0
-ADULT_MASS = 1.3
-STUDENT_MAX_SPEED = 100.0
-ADULT_MAX_SPEED = 80.0
+# --- Agent Physical Properties ---
+STUDENT_RADIUS = 3.0                # Visual and collision radius for students
+ADULT_RADIUS = 4.0                  # Visual and collision radius for adults
+STUDENT_MASS = 1.0                  # Relative mass for physics/collisions
+ADULT_MASS = 1.3                    # Relative mass for physics/collisions
+STUDENT_MAX_SPEED = 100.0           # Maximum movement speed (units per second)
+ADULT_MAX_SPEED = 80.0              # Maximum movement speed (units per second)
 
-# Idle behavior parameters
-STUDENT_IDLE_PROBABILITY = 0.5
-ADULT_IDLE_PROBABILITY = 0.7
-STUDENT_IDLE_DURATION_RANGE = (1, 3)  # (min, max) in seconds
-ADULT_IDLE_DURATION_RANGE = (1.5, 4)  # (min, max) in seconds
-STUDENT_PATH_TIME_RANGE = (0.5, 2)  # (min, max) in seconds
-ADULT_PATH_TIME_RANGE = (1, 3)  # (min, max) in seconds
+# --- Agent Behavior ---
+STUDENT_IDLE_PROBABILITY = 0.5      # Chance per second a student might decide to idle
+ADULT_IDLE_PROBABILITY = 0.7        # Chance per second an adult might decide to idle
+STUDENT_IDLE_DURATION_RANGE = (1, 3) # (min, max) seconds for student idle state
+ADULT_IDLE_DURATION_RANGE = (1.5, 4)# (min, max) seconds for adult idle state
+STUDENT_PATH_TIME_RANGE = (0.5, 2)  # (min, max) seconds student follows a path before reconsidering
+ADULT_PATH_TIME_RANGE = (1, 3)      # (min, max) seconds adult follows a path before reconsidering
 
-# Movement & collision parameters
-PERSONAL_SPACE_FACTOR = 3  # Multiple of agent radius
-MIN_DISTANCE_FACTOR = 2    # Multiple of agent radius
-AVOIDANCE_STRENGTH = 30.0
-WALL_AVOIDANCE_STRENGTH = 50.0
+# --- Movement & Collision ---
+# These factors likely used within agent logic or SchoolModel collision handling
+AVOIDANCE_STRENGTH = 30.0           # Factor for agent-agent avoidance force
+WALL_AVOIDANCE_STRENGTH = 50.0      # Factor for agent-wall avoidance force
+# PERSONAL_SPACE_FACTOR = 3         # (Uncomment if used) Multiplier for preferred distance
+# MIN_DISTANCE_FACTOR = 2           # (Uncomment if used) Multiplier for minimum separation
 
-# Shooter parameters
-SHOOTER_CHECK_INTERVAL = 10.0  # Seconds between checks for random shooter emergence
-SHOOTER_EMERGENCE_PROBABILITY = 0.01  # Probability per check (0.01 = 1%)
-SHOOTING_INTERVAL = 2.0  # Seconds between shots
-SHOOTING_RANGE = 25.0  # Units
-HIT_PROBABILITY = 0.7  # Probability to hit target (0.5 = 50%)
-SHOOTER_SEARCH_DURATION = 5.0  # How long shooter searches before changing strategy
-STEAL_RANGE = 10.0  # Units within which a student can attempt to steal
-STEAL_PROBABILITY = 0.001  # Probability per step to attempt stealing
+# --- Shooter Behavior ---
+# Random shooter emergence parameters (may be used in SchoolModel)
+SHOOTER_CHECK_INTERVAL = 10.0       # Seconds between checks for random shooter emergence
+SHOOTER_EMERGENCE_PROBABILITY = 0.01# Probability per check that an agent becomes a shooter
 
-# Response & awareness parameters
-ADULT_RESPONSE_DELAY_RANGE = (2, 5)  # (min, max) time steps
-AWARENESS_RANGE = 50  # Distance (units) within which students become aware of a shooter
-SCREAM_RADIUS = 25
-ENABLE_STUDENT_SCREAMING = True
+ADULT_WEAPON_PROBABILITY = 0.1      # Probability an adult starts with / acquires a weapon
+SHOOTING_INTERVAL = 2.0             # Seconds between shots for a shooter
+SHOOTING_RANGE = 100.0              # Max distance a shooter can fire (units)
+HIT_PROBABILITY = 0.7               # Base probability to hit target within range
+SHOOTER_SEARCH_DURATION = 5.0       # How long shooter searches before changing strategy (used in shooter agent logic)
+STEAL_RANGE = 10.0                  # Max distance for a student to attempt stealing a weapon (used in student agent logic)
+STEAL_PROBABILITY = 0.001           # Probability per step for a student to attempt stealing (used in student agent logic)
 
-# Visualization parameters
-VISION_CONE_ANGLE = 120  # Degrees
-MAX_VISION_DISTANCE = 150  # Units # Still used for shooter visualization
-SHOT_VISUALIZATION_DURATION = 0.5  # Seconds
-ALERT_DURATION = 5.0  # Seconds
+# --- Response & Awareness ---
+ADULT_RESPONSE_DELAY_RANGE = (0.5, 2.0) # (min, max) seconds delay before adult reacts to threat (used in adult agent logic)
+AWARENESS_RANGE = 50                # Distance to passively become aware of shooter/threat (used in agent logic)
+SCREAM_RADIUS = 30                  # Distance a student's scream travels, potentially alerting others
+ENABLE_STUDENT_SCREAMING = True     # Whether students scream when in emergency (affects awareness spread)
 
-# Colors
+# --- Visualization ---
+VISION_CONE_ANGLE = 120             # Field of view angle for shooter visualization (degrees)
+MAX_VISION_DISTANCE = 150           # Max distance for shooter vision cone visualization (units)
+SHOT_VISUALIZATION_DURATION = 0.25  # Seconds a shot line remains visible
+ALERT_DURATION = 5.0                # Seconds the "ACTIVE SHOOTER" alert is shown
+
+# --- Sound ---
+GUNSHOT_SOUND_FILE = "gunshot.wav"  # Path to gunshot sound effect
+KILL_SOUND_FILE = "kill.wav"        # Path to sound effect when agent is hit/killed
+SOUND_VOLUME = 0.4                  # Default volume for sound effects (0.0 to 1.0)
+
+# --- Colors ---
 COLORS = {
+    # Basic Environment
     "WHITE": (255, 255, 255),
-    "BLUE": (0, 0, 255),  # Regular students
-    "RED": (255, 0, 0),   # Adults
-    "BLACK": (0, 0, 0),   # Walls and text
-    "GREEN": (0, 255, 0),  # Shooter
-    "ARMED_STUDENT": (100, 100, 255),
-    "ARMED_ADULT": (255, 100, 100),
-    "ALERT": (255, 0, 0),
-    "SCREAM_FILL": (255, 165, 0, 50),   # Semi-transparent Orange fill
-    "SCREAM_OUTLINE": (255, 140, 0, 100) # Darker Orange outline
-}
+    "BLACK": (0, 0, 0),             # Walls, some text
+    "BROWN": (139, 69, 19),         # Doors
 
-# Key mappings (pygame key constants will be used in code)
-KEY_MAPPING = {
-    "SPEED_UP": "UP",
-    "SPEED_DOWN": "DOWN",
-    "RESET_SPEED": "SPACE",
-    "ADD_STUDENTS": "s",
-    "ADD_ADULTS": "a",
-    "TOGGLE_LINE_OF_SIGHT": "v",
-    "TOGGLE_SAFE_AREAS": "b",
-    "EMERGENCY_EVACUATION": "e",
-    "ADD_SHOOTER": "x"  # New key for manually adding a shooter
+    # Agents
+    "BLUE": (0, 0, 255),            # Regular students
+    "FLEEING_STUDENT": (0, 100, 255),# Students in emergency
+    "RED": (200, 0, 0),             # Regular adults (less intense red)
+    "AWARE_ADULT": (255, 100, 0),   # Adults aware of shooter
+    "GREEN": (0, 255, 0),           # Shooter agent
+    "ARMED_STUDENT": (100, 100, 255),# Student who somehow got a weapon (if implemented)
+    "ARMED_ADULT": (255, 255, 0),   # Adults with weapons (Yellow)
+
+    # UI & Effects
+    "PANEL_BG": (50, 50, 50, 180),  # Semi-transparent dark gray for UI panels
+    "TEXT_COLOR": (240, 240, 240),  # Light text color for UI panels
+    "ALERT": (255, 0, 0),           # Color for shooter count text when > 0, shots
+    "SHOT": (255, 0, 0),            # Color of the shot visualization line
+    "SCREAM_FILL": (255, 165, 0, 40),# Fainter orange fill for scream radius
+    "SCREAM_OUTLINE": (255, 165, 0, 80),# Fainter orange outline for scream radius
+    "EXIT_FILL": (0, 200, 0, 80),   # Semi-transparent green for exit areas
+    "EXIT_BORDER": (0, 100, 0, 150) # Darker green border for exit areas
 }
-# --- END OF FILE config.py ---
