@@ -4,9 +4,6 @@ import os
 from grid_converter import integrate_grid_into_simulation
 import config
 import pygame # Ensure pygame is imported
-from a_star import astar
-import time
-
 
 class AgentFactory:
     """Factory class for creating different types of agents."""
@@ -132,6 +129,7 @@ class SchoolModel:
         self.shooter_appeared_flag = False
         self.first_shooter_appearance_time = 0.0
         self.terminate_simulation = False
+        self.termination_reason = None  # <-- Initialize the attribute here
 
         # --- Data Collection Attributes ---
         self.initial_student_count = n_students
@@ -235,29 +233,39 @@ class SchoolModel:
     def step_continuous(self, dt):
         """Perform a continuous time step with delta time dt."""
         if self.terminate_simulation:
-             # Optioneel: print hier nog iets of doe niks extra's.
-             # De main loop zal de property `should_terminate` checken.
-             return # Stop verdere verwerking van deze stap
+             # Optional: print something here or do nothing extra.
+             # The main loop will check the `should_terminate` property.
+             return # Stop further processing of this step
 
         self.simulation_time += dt
 
         # Check for random shooter emergence
         if not self.has_active_shooter and self.simulation_time - self.last_shooter_check_time >= self.shooter_check_interval:
             self.last_shooter_check_time = self.simulation_time
-            self._check_for_shooter_emergence() # Deze functie zet mogelijk has_active_shooter op True
+            self._check_for_shooter_emergence() # This function might set has_active_shooter to True
 
         # Check if a shooter has appeared
         if self.has_active_shooter and not self.shooter_appeared_flag:
             self.shooter_appeared_flag = True
             self.first_shooter_appearance_time = self.simulation_time
-            print(f"--- EERSTE SCHUTTER GEDETECTEERD op tijd {self.simulation_time:.1f}s. Simulatie eindigt over {config.TERMINATION_DELAY_AFTER_SHOOTER}s ---")
+            print(f"--- FIRST SHOOTER DETECTED at time {self.simulation_time:.1f}s. Simulation ends in {config.TERMINATION_DELAY_AFTER_SHOOTER}s ---")
 
         # Check if the simulation should terminate after a shooter appears
         if self.shooter_appeared_flag:
+            # Check if enough time has passed since the first shooter appeared
             if self.simulation_time - self.first_shooter_appearance_time >= config.TERMINATION_DELAY_AFTER_SHOOTER:
-                self.terminate_simulation = True
-                print(f"--- SIMULATIE TERMINATIE GETRIGGERD op tijd {self.simulation_time:.1f}s ---")
-                # We stoppen niet direct hier, maar zetten de flag zodat de main loop kan stoppen.
+                if not self.terminate_simulation: # Only set reason on first trigger
+                    self.terminate_simulation = True
+                    self.termination_reason = f"Timeout after shooter ({config.TERMINATION_DELAY_AFTER_SHOOTER}s)" # <-- Set the reason here
+                    print(f"--- SIMULATION TERMINATION TRIGGERED at time {self.simulation_time:.1f}s ({self.termination_reason}) ---")
+                # We don't stop immediately here, but set the flag so the main loop can stop.
+
+        # (Future Enhancement: Add other termination conditions here, e.g., no agents left)
+        # if not self.schedule and not self.terminate_simulation:
+        #     self.terminate_simulation = True
+        #     self.termination_reason = "No agents remaining"
+        #     print(f"--- SIMULATION TERMINATION TRIGGERED at time {self.simulation_time:.1f}s ({self.termination_reason}) ---")
+
 
         # Shuffle and step agents
         random.shuffle(self.schedule) # Consider if shuffling is still needed or detrimental
@@ -265,7 +273,7 @@ class SchoolModel:
         for agent in agents_to_process:
             # Ensure agent is still in the main schedule before stepping
             if agent in self.schedule:
-                 agent.step_continuous(dt) # Stap van de agent uitvoeren
+                 agent.step_continuous(dt) # Execute agent's step
 
 
     def _check_for_shooter_emergence(self):
@@ -300,11 +308,11 @@ class SchoolModel:
         self.active_shooters.add(random_student)
         print(f"MANUAL ALERT: Student {random_student.unique_id} has become an active shooter "
               f"at time {self.simulation_time:.1f}s")
-        
+
         if not self.shooter_appeared_flag:
             self.shooter_appeared_flag = True
             self.first_shooter_appearance_time = self.simulation_time
-            print(f"--- EERSTE SCHUTTER (handmatig) GEDETECTEERD op tijd {self.simulation_time:.1f}s. Simulatie eindigt over {config.TERMINATION_DELAY_AFTER_SHOOTER}s ---")
+            print(f"--- FIRST SHOOTER (manual) DETECTED at time {self.simulation_time:.1f}s. Simulation ends in {config.TERMINATION_DELAY_AFTER_SHOOTER}s ---")
 
         return True
 
@@ -312,16 +320,16 @@ class SchoolModel:
     def has_active_shooter(self):
         """Check if there is at least one active shooter."""
         return len(self.active_shooters) > 0
-    
+
     @property
     def should_terminate(self):
-        """Property om aan te geven of de simulatie moet stoppen."""
+        """Property indicating if the simulation should stop."""
         return self.terminate_simulation
-    
+
     @property
     def exit_rects(self):
         return self.exits
-    
+
     @property
     def vision_blocking_obstacles(self):
         """Returns a combined list of walls and doors for vision checks."""
@@ -329,19 +337,31 @@ class SchoolModel:
 
     def add_students(self, count):
         """Add a specified number of students to the simulation."""
-        for _ in range(count):
+        current_id = len(self.schedule) + self.dead_student_count + self.escaped_student_count + self.dead_adult_count
+        for i in range(count):
             position = self.generate_safe_position(min_wall_distance=5.0)
-            agent = AgentFactory.create_agent("student", len(self.schedule), self, position)
+            agent = AgentFactory.create_agent("student", current_id + i, self, position)
             self.schedule.append(agent)
             self.spatial_grid.update_agent(agent)
+        self.num_students += count # Also update the count if needed elsewhere
 
     def add_adults(self, count):
         """Add a specified number of adults to the simulation."""
-        for _ in range(count):
+        current_id = len(self.schedule) + self.dead_student_count + self.escaped_student_count + self.dead_adult_count
+        for i in range(count):
             position = self.generate_safe_position(min_wall_distance=5.0)
-            agent = AgentFactory.create_agent("adult", len(self.schedule), self, position)
+            agent = AgentFactory.create_agent("adult", current_id + i, self, position)
+            # Configure if this adult has a weapon
+            if random.random() < self.adult_weapon_percentage:
+                agent.has_weapon = True
+                # agent.color = config.COLORS.get("ARMED_ADULT", (255, 255, 0)) # Color is handled in visualizer
+                print(f"Added Adult {agent.unique_id} is armed.")
+            else:
+                agent.has_weapon = False
             self.schedule.append(agent)
             self.spatial_grid.update_agent(agent)
+        self.num_adults += count # Also update the count if needed elsewhere
+
 
     # Ensure generate_safe_position is updated if necessary
     def generate_safe_position(self, min_wall_distance=5.0, max_attempts=100):
@@ -368,6 +388,12 @@ class SchoolModel:
         x, y = position
         agent_radius = min_wall_distance # Use min_wall_distance as effective radius check
 
+        # Check boundary conditions first (more efficient)
+        if not (agent_radius <= x <= self.width - agent_radius and
+                agent_radius <= y <= self.height - agent_radius):
+            return False
+
+        # Check internal walls
         for wall_rect in self.walls:
             # Check collision using inflate to account for distance
             # Inflate creates a larger rect; if point is inside inflated rect, it's too close
@@ -379,15 +405,25 @@ class SchoolModel:
             if wall_rect.collidepoint(x,y):
                  return False # Inside the wall exactly
 
+        # Check doors as obstacles too for spawning
+        for door_rect in self.doors:
+             inflated_door = door_rect.inflate(agent_radius * 2, agent_radius * 2)
+             if inflated_door.collidepoint(x, y):
+                  return False # Too close to this door
+             if door_rect.collidepoint(x, y):
+                  return False # Inside the door exactly
+
         return True
 
     # In find_safest_position, update the wall check:
     def find_safest_position(self, padding):
         """
-        Find the position with maximum distance to any wall Rect.
+        Find the position with maximum distance to any wall or door Rect.
+        (Simplified fallback - considers only walls for now)
         """
         grid_size = 20
         candidates = []
+        obstacles = self.walls + self.doors # Consider all obstacles
 
         for i in range(grid_size):
             for j in range(grid_size):
@@ -395,31 +431,32 @@ class SchoolModel:
                 y = padding + (self.height - 2 * padding) * j / (grid_size - 1)
 
                 min_distance = float('inf')
-                inside_wall = False
+                inside_obstacle = False
 
-                for wall_rect in self.walls:
-                    if wall_rect.collidepoint(x, y):
-                        inside_wall = True
-                        break # Skip if inside wall
+                for obst_rect in obstacles:
+                    if obst_rect.collidepoint(x, y):
+                        inside_obstacle = True
+                        break # Skip if inside obstacle
 
                     # Calculate distance to closest point on Rect boundary
-                    clamped_x = max(wall_rect.left, min(x, wall_rect.right))
-                    clamped_y = max(wall_rect.top, min(y, wall_rect.bottom))
+                    clamped_x = max(obst_rect.left, min(x, obst_rect.right))
+                    clamped_y = max(obst_rect.top, min(y, obst_rect.bottom))
                     dx = x - clamped_x
                     dy = y - clamped_y
                     distance = math.hypot(dx, dy)
                     min_distance = min(min_distance, distance)
 
-                if inside_wall:
+                if inside_obstacle:
                     continue
 
                 candidates.append((x, y, min_distance))
 
         if candidates:
             candidates.sort(key=lambda c: -c[2])
+            print(f"Fallback: Chose safest position ({candidates[0][0]:.1f}, {candidates[0][1]:.1f})")
             return (candidates[0][0], candidates[0][1])
         else:
-            print("Warning: No safe position found, using center.")
+            print("Warning: No safe position found even with fallback, using center.")
             return (self.width / 2, self.height / 2)
 
     def remove_agent(self, agent, reason="died"):
@@ -438,6 +475,9 @@ class SchoolModel:
                  # Only count students escaping for now
                 if agent.agent_type == "student":
                      self.escaped_student_count += 1
+                 # Optionally count escaping adults if needed
+                 # elif agent.agent_type == "adult":
+                 #     self.escaped_adult_count += 1
 
             # Remove from active shooters set if necessary
             if agent in self.active_shooters:
@@ -468,7 +508,7 @@ class SchoolModel:
             if agent.agent_type == "student":
                 living_students += 1
                 if getattr(agent, 'is_shooter', False):
-                    living_shooters += 1
+                    living_shooters += 1 # Count student shooters living
             elif agent.agent_type == "adult":
                 living_adults += 1
                 if getattr(agent, 'has_weapon', False):
@@ -479,10 +519,10 @@ class SchoolModel:
                 # if getattr(agent, 'is_shooter', False):
                 #    living_shooters += 1 # Add if needed
 
-        # Sanity check: ensure living shooters count matches active_shooters set
-        # It might differ slightly if an agent is removed mid-step *after* counting
-        # Using len(self.active_shooters) is likely more accurate for *current* state.
-        living_shooters = len(self.active_shooters)
+        # Using len(self.active_shooters) gives the current count of agents flagged as shooters
+        # This might be slightly different than iterating if a shooter was removed this step
+        current_living_shooters = len(self.active_shooters)
+
 
         # Total deaths are tracked directly
         total_dead_students = self.dead_student_count
@@ -497,7 +537,7 @@ class SchoolModel:
             "Living Adults": living_adults,
             "Living Armed Adults": living_armed_adults,
             "Living Unarmed Adults": living_unarmed_adults,
-            "Living Shooters": living_shooters,
+            "Living Shooters": current_living_shooters, # Use the count from the active set
             "Dead Students": total_dead_students,
             "Dead Adults": total_dead_adults,
             "Escaped Students": total_escaped_students
