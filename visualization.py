@@ -1,7 +1,7 @@
 import pygame
 import math
 import time
-from utilities import has_line_of_sight, cast_ray
+from utilities import cast_ray
 import config
 
 
@@ -16,30 +16,66 @@ class Visualizer:
         self.scale_factor = min(screen_width / model.width, screen_height / model.height)
 
         # Initialize Pygame screen
+        pygame.display.init()
+        pygame.font.init()
         self.screen = pygame.display.set_mode((screen_width, screen_height))
         pygame.display.set_caption("School Safety Simulation")
 
         # Use colors from config
         self.COLORS = config.COLORS
-        if "BROWN" not in self.COLORS:
-            self.COLORS["BROWN"] = (139, 69, 19)
+        # Add default colors if missing
+        defaults = {
+            "BROWN": (139, 69, 19),
+            "PANEL_BG": (50, 50, 50, 180), # Semi-transparent dark gray
+            "TEXT_COLOR": (240, 240, 240), # Light gray/white
+            "ALERT": (255, 0, 0),
+            "WHITE": (255, 255, 255),
+            "BLACK": (0, 0, 0),
+            "BLUE": (0, 0, 255),
+            "RED": (200, 0, 0), # Slightly less bright red for adults
+            "GREEN": (0, 150, 0), # Shooter color
+            "ARMED_STUDENT": (100, 100, 255), # Lighter blue
+            "ARMED_ADULT": (255, 255, 0), # Yellow
+            "AWARE_ADULT": (255, 100, 0), # Orange
+            "FLEEING_STUDENT": (0, 100, 255), # Darker blue
+            "SCREAM_FILL": (255, 165, 0, 30), # Fainter orange fill
+            "SCREAM_OUTLINE": (255, 165, 0, 60), # Fainter orange outline
+            "SHOT": (255, 0, 0),
+            "EXIT_FILL": (0, 200, 0, 80), # Semi-transparent green
+            "EXIT_BORDER": (0, 100, 0, 150) # Darker green border
+        }
+        for key, value in defaults.items():
+            self.COLORS.setdefault(key, value)
+
 
         # Create cached background with walls and doors
         self._create_cached_background()
 
-        # Prepare fonts for UI elements
-        self.font = pygame.font.SysFont(None, 24)
-        self.alert_font = pygame.font.SysFont(None, 36)
+        # Prepare fonts for UI elements (smaller sizes)
+        self.ui_font_size = 18
+        self.help_font_size = 16
+        self.alert_font_size = 28
+        try:
+            self.ui_font = pygame.font.SysFont(None, self.ui_font_size)
+            self.help_font = pygame.font.SysFont(None, self.help_font_size)
+            self.alert_font = pygame.font.SysFont(None, self.alert_font_size)
+        except Exception as e:
+            print(f"Error initializing font: {e}. Using default font.")
+            self.ui_font = pygame.font.Font(None, self.ui_font_size)
+            self.help_font = pygame.font.Font(None, self.help_font_size)
+            self.alert_font = pygame.font.Font(None, self.alert_font_size)
 
-        # Pre-render help text for performance
-        self.help_text = self.font.render(
-            "↑/↓: Speed up/down | Space: Reset speed | S: Add students | A: Add adults | X: Add shooter",
-            True, self.COLORS["BLACK"]
-        )
-        self.viz_help_text = self.font.render(
-            "V: Toggle Vision Cone | B: Toggle Safe Areas",
-            True, self.COLORS["BLACK"]
-        )
+        self.ui_line_height = self.ui_font.get_linesize()
+        self.help_line_height = self.help_font.get_linesize()
+
+        # Pre-render help text for performance (updated with UI toggle)
+        self.help_text_lines = [
+            "Controls: ↑/↓: Speed | Space: Reset Speed | S: Add Student | A: Add Adult | X: Add Shooter",
+            "Toggles: V: Vision Cone | H: Hide/Show UI"
+        ]
+        self.rendered_help_lines = [
+            self.help_font.render(line, True, self.COLORS["TEXT_COLOR"]) for line in self.help_text_lines
+        ]
 
         # Alert system variables
         self.show_alert = False
@@ -59,7 +95,7 @@ class Visualizer:
             pygame.draw.rect(self.background, self.COLORS["BLACK"], scaled_rect)
 
         # Draw doors
-        door_color = self.COLORS.get("BROWN", (139, 69, 19))
+        door_color = self.COLORS["BROWN"]
         for door_rect in self.model.doors:
             scaled_rect = self._scale_rect(door_rect)
             pygame.draw.rect(self.background, door_color, scaled_rect)
@@ -69,13 +105,13 @@ class Visualizer:
         return pygame.Rect(
             int(rect.left * self.scale_factor),
             int(rect.top * self.scale_factor),
-            int(rect.width * self.scale_factor + 0.5),
-            int(rect.height * self.scale_factor + 0.5)
+            max(1, int(rect.width * self.scale_factor + 0.5)), # Ensure width is at least 1
+            max(1, int(rect.height * self.scale_factor + 0.5)) # Ensure height is at least 1
         )
 
     def _model_to_screen_pos(self, pos):
         """Convert model coordinates to screen coordinates."""
-        return (int(pos[0] * self.scale_factor), int(pos[1] * self.scale_factor))
+        return int(pos[0] * self.scale_factor), int(pos[1] * self.scale_factor)
 
     def show_shooter_alert(self):
         """Display an active shooter alert."""
@@ -85,27 +121,24 @@ class Visualizer:
 
     def check_shooter_status(self):
         """Check if shooter status has changed and show alert if needed."""
-        if self.model.has_active_shooter and not self.last_has_shooter:
+        current_shooter_status = self.model.has_active_shooter
+        if current_shooter_status and not self.last_has_shooter:
             self.show_shooter_alert()
-        self.last_has_shooter = self.model.has_active_shooter
+        self.last_has_shooter = current_shooter_status
 
     def visualize_vision_cone(self, vision_angle=config.VISION_CONE_ANGLE,
                               max_vision_distance=config.MAX_VISION_DISTANCE):
         """Visualize the vision cone for active shooters."""
-        # Find shooters
-        shooters = [agent for agent in self.model.schedule if getattr(agent, 'is_shooter', False)]
+        shooters = self.model.active_shooters
         if not shooters:
             return
 
-        # Create a transparent surface for visualization
         temp_surface = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
 
-        # Draw vision cone for each shooter
         for shooter in shooters:
             shooter_pos = shooter.position
             screen_shooter_pos = self._model_to_screen_pos(shooter_pos)
 
-            # Determine facing direction
             facing_angle = getattr(shooter, 'direction', 0)
             if hasattr(shooter, 'locked_target') and shooter.locked_target:
                 target_pos = shooter.locked_target.position
@@ -118,68 +151,25 @@ class Visualizer:
                 if vx != 0 or vy != 0:
                     facing_angle = math.atan2(vy, vx)
 
-            # Calculate vision cone angles
             vision_angle_rad = math.radians(vision_angle)
             start_angle = facing_angle - vision_angle_rad / 2
             end_angle = facing_angle + vision_angle_rad / 2
 
-            # Create polygon points for vision cone
-            num_rays = 30
+            num_rays = 20
             polygon_points = [screen_shooter_pos]
+            scaled_max_dist = max_vision_distance
 
-            for i in range(num_rays):
-                ray_angle = start_angle + (end_angle - start_angle) * i / (num_rays - 1)
-                ray_endpoint = cast_ray(
-                    shooter_pos, ray_angle, max_vision_distance, self.model.vision_blocking_obstacles
+            for i in range(num_rays + 1):
+                ray_angle = start_angle + (end_angle - start_angle) * i / num_rays
+                hit_point = cast_ray(
+                    shooter_pos, ray_angle, scaled_max_dist, self.model.vision_blocking_obstacles
                 )
-                screen_endpoint = self._model_to_screen_pos(ray_endpoint)
+                screen_endpoint = self._model_to_screen_pos(hit_point)
                 polygon_points.append(screen_endpoint)
 
-            # Draw vision cone
             if len(polygon_points) > 2:
-                pygame.draw.polygon(temp_surface, (255, 255, 0, 60), polygon_points)
-                pygame.draw.polygon(temp_surface, (255, 255, 0, 120), polygon_points, 1)
-
-            # Draw direction indicator
-            dir_len = 20 * self.scale_factor
-            dir_endpoint = (
-                screen_shooter_pos[0] + math.cos(facing_angle) * dir_len,
-                screen_shooter_pos[1] + math.sin(facing_angle) * dir_len
-            )
-            pygame.draw.line(temp_surface, (255, 255, 0, 200), screen_shooter_pos, dir_endpoint, 2)
-
-            # Draw line-of-sight to visible agents
-            for agent in self.model.schedule:
-                if agent == shooter:
-                    continue
-
-                agent_pos = agent.position
-                screen_agent_pos = self._model_to_screen_pos(agent_pos)
-
-                has_sight = has_line_of_sight(shooter_pos, agent_pos, self.model.vision_blocking_obstacles)
-                if has_sight:
-                    pygame.draw.line(temp_surface, (0, 255, 0, 180), screen_shooter_pos, screen_agent_pos, 2)
-
-                    # Highlight locked target
-                    if hasattr(shooter, 'locked_target') and agent == shooter.locked_target:
-                        pygame.draw.circle(temp_surface, (255, 0, 0, 180), screen_agent_pos,
-                                           int(8 * self.scale_factor), 2)
-
-        self.screen.blit(temp_surface, (0, 0))
-
-    def visualize_safe_spawn_areas(self):
-        """Visualize areas where agents can safely spawn."""
-        temp_surface = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
-        grid_step = 20  # Larger step for better performance
-
-        for x in range(0, self.model.width, grid_step):
-            for y in range(0, self.model.height, grid_step):
-                # Check if point is in a wall
-                is_in_wall = any(wall_rect.collidepoint(x, y) for wall_rect in self.model.walls)
-
-                screen_pos = self._model_to_screen_pos((x, y))
-                color = (255, 0, 0, 100) if is_in_wall else (0, 255, 0, 40)
-                pygame.draw.circle(temp_surface, color, screen_pos, 3)
+                pygame.draw.polygon(temp_surface, (255, 255, 0, 40), polygon_points)
+                pygame.draw.polygon(temp_surface, (255, 255, 0, 90), polygon_points, 1)
 
         self.screen.blit(temp_surface, (0, 0))
 
@@ -193,63 +183,69 @@ class Visualizer:
             self.show_alert = False
             return
 
-        # Create alert text
         text_surface = self.alert_font.render(self.alert_message, True, self.COLORS["WHITE"])
         text_rect = text_surface.get_rect()
 
-        # Create alert box
-        alert_width = text_rect.width + 40
-        alert_height = text_rect.height + 20
+        padding = 10
+        alert_width = text_rect.width + 2 * padding
+        alert_height = text_rect.height + 2 * padding
         alert_surface = pygame.Surface((alert_width, alert_height), pygame.SRCALPHA)
 
-        # Pulse effect
         elapsed = current_time - self.alert_start_time
-        pulse_factor = 0.5 + 0.5 * math.sin(elapsed * 10)
-        alpha = int(180 + 75 * pulse_factor)
+        pulse_factor = 0.7 + 0.3 * math.sin(elapsed * 6)
+        alpha = int(150 + 55 * pulse_factor)
 
-        # Draw alert box with border
         alert_rect = pygame.Rect(0, 0, alert_width, alert_height)
-        pygame.draw.rect(alert_surface, (255, 0, 0, alpha), alert_rect, border_radius=10)
-        pygame.draw.rect(alert_surface, (255, 255, 255, 255), alert_rect, width=2, border_radius=10)
+        pygame.draw.rect(alert_surface, (200, 0, 0, alpha), alert_rect, border_radius=8)
+        pygame.draw.rect(alert_surface, (255, 255, 255, 200), alert_rect, width=1, border_radius=8)
 
-        # Position and add text
-        text_x = (alert_width - text_rect.width) // 2
-        text_y = (alert_height - text_rect.height) // 2
+        text_x = padding
+        text_y = padding
         alert_surface.blit(text_surface, (text_x, text_y))
 
-        # Position and draw alert
         alert_x = (self.screen_width - alert_width) // 2
-        alert_y = 100
+        alert_y = 60
         self.screen.blit(alert_surface, (alert_x, alert_y))
 
     def draw_agents(self):
-        """Draw all agents and their status indicators."""
-        # Create overlay for transparent elements
+        """Draw all agents with appropriate radii and status indicators."""
         overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
 
-        # Prepare agent drawing
         for agent in self.model.schedule:
+            if not hasattr(agent, 'position'): continue
+
             pos = agent.position
             screen_pos = self._model_to_screen_pos(pos)
-            radius = max(1, int(agent.radius * self.scale_factor))
 
-            # Determine agent color based on type and status
+            # Determine base radius based on agent type
             if agent.agent_type == "student":
-                if getattr(agent, "is_shooter", False):
-                    color = self.COLORS["GREEN"]
-                elif getattr(agent, "has_weapon", False):
+                base_radius = config.STUDENT_RADIUS
+            elif agent.agent_type == "adult":
+                base_radius = config.ADULT_RADIUS
+            else:
+                base_radius = config.STUDENT_RADIUS # Default if type unknown
+
+            radius = max(1, int(base_radius * self.scale_factor))
+
+            # Determine agent color
+            if getattr(agent, "is_shooter", False):
+                 color = self.COLORS["GREEN"]
+            elif agent.agent_type == "student":
+                if getattr(agent, "has_weapon", False):
                     color = self.COLORS["ARMED_STUDENT"]
                 elif getattr(agent, "in_emergency", False):
-                    color = (0, 100, 255)  # Darker blue for fleeing
+                    color = self.COLORS["FLEEING_STUDENT"]
                 else:
                     color = self.COLORS["BLUE"]
-            else:  # adult
+            elif agent.agent_type == "adult":
                 if getattr(agent, "has_weapon", False):
-                    color = (255, 255, 0)  # Yellow for armed
+                    color = self.COLORS["ARMED_ADULT"]
                 elif getattr(agent, "aware_of_shooter", False):
-                    color = (255, 100, 0)  # Orange for aware
+                    color = self.COLORS["AWARE_ADULT"]
                 else:
                     color = self.COLORS["RED"]
+            else:
+                 color = self.COLORS["BLACK"] # Default fallback
 
             # Draw agent circle
             pygame.draw.circle(self.screen, color, screen_pos, radius)
@@ -260,124 +256,152 @@ class Visualizer:
                 speed_squared = vx * vx + vy * vy
                 if speed_squared > 0.01:
                     speed = math.sqrt(speed_squared)
-                    dir_len = radius + 2
-                    dir_x = vx / speed * dir_len
-                    dir_y = vy / speed * dir_len
-                    end_pos = (int(screen_pos[0] + dir_x), int(screen_pos[1] + dir_y))
+                    dir_len = radius * 0.8
+                    end_pos = (
+                        int(screen_pos[0] + (vx / speed) * dir_len),
+                        int(screen_pos[1] + (vy / speed) * dir_len)
+                    )
                     pygame.draw.line(self.screen, self.COLORS["BLACK"], screen_pos, end_pos, 1)
 
             # Draw scream radius for students in emergency
             if (config.ENABLE_STUDENT_SCREAMING and agent.agent_type == "student"
                     and getattr(agent, "in_emergency", False)):
                 scream_radius = int(config.SCREAM_RADIUS * self.scale_factor)
-                if scream_radius > 0:
-                    pygame.draw.circle(overlay, self.COLORS["SCREAM_FILL"], screen_pos, scream_radius)
-                    pygame.draw.circle(overlay, self.COLORS["SCREAM_OUTLINE"], screen_pos, scream_radius, 1)
+                if scream_radius > 1:
+                    scream_fill = self.COLORS["SCREAM_FILL"]
+                    scream_outline = self.COLORS["SCREAM_OUTLINE"]
+                    pygame.draw.circle(overlay, scream_fill, screen_pos, scream_radius)
+                    pygame.draw.circle(overlay, scream_outline, screen_pos, scream_radius, 1)
 
-        # Draw overlay
         self.screen.blit(overlay, (0, 0))
 
     def draw_shots(self):
         """Draw active gunshots."""
         current_time = self.model.simulation_time
         shot_duration = config.SHOT_VISUALIZATION_DURATION
-        shots_to_remove = []
 
-        for i, shot in enumerate(self.model.active_shots):
-            if current_time - shot['start_time'] < shot_duration:
-                start_screen = self._model_to_screen_pos(shot['start_pos'])
-                end_screen = self._model_to_screen_pos(shot['end_pos'])
-                pygame.draw.line(self.screen, (255, 0, 0), start_screen, end_screen, 2)
-            else:
-                shots_to_remove.append(i)
+        valid_shots = [
+            shot for shot in self.model.active_shots
+            if current_time - shot['start_time'] < shot_duration
+        ]
 
-        # Remove expired shots
-        for i in sorted(shots_to_remove, reverse=True):
-            if i < len(self.model.active_shots):
-                self.model.active_shots.pop(i)
+        shot_color = self.COLORS["SHOT"]
+        for shot in valid_shots:
+            start_screen = self._model_to_screen_pos(shot['start_pos'])
+            end_screen = self._model_to_screen_pos(shot['end_pos'])
+            pygame.draw.line(self.screen, shot_color, start_screen, end_screen, 1)
+
+        if len(valid_shots) != len(self.model.active_shots):
+            self.model.active_shots = valid_shots
 
     def draw_exits(self):
         """Draw exit areas."""
-        exit_color = (0, 255, 0, 150)
-        exit_border_color = (0, 100, 0)
+        exit_fill = self.COLORS["EXIT_FILL"]
+        exit_border = self.COLORS["EXIT_BORDER"]
 
         for exit_rect in self.model.exits:
             scaled_rect = self._scale_rect(exit_rect)
-            pygame.draw.rect(self.screen, exit_color, scaled_rect)
-            pygame.draw.rect(self.screen, exit_border_color, scaled_rect, 1)
+            pygame.draw.rect(self.screen, exit_fill, scaled_rect)
+            pygame.draw.rect(self.screen, exit_border, scaled_rect, 1)
 
-    def draw_ui(self, simulation_time, sim_speed, fps, show_vision, show_safe_areas):
-        """Draw user interface elements."""
-        # Count agents by type
-        student_count = sum(1 for agent in self.model.schedule if agent.agent_type == "student")
-        adult_count = sum(1 for agent in self.model.schedule if agent.agent_type == "adult")
+    def draw_ui(self, simulation_time, sim_speed, fps, show_vision):
+        """Draw user interface elements in compact panels."""
+        # This function now assumes it's only called when show_ui is True.
+        # The conditional check happens in render_frame.
+
+        student_count = 0
+        adult_count = 0
+        for agent in self.model.schedule:
+            if agent.agent_type == "student": student_count += 1
+            elif agent.agent_type == "adult": adult_count += 1
         shooter_count = len(self.model.active_shooters)
 
-        # Prepare UI text
-        time_text = self.font.render(f"Sim Time: {simulation_time:.1f}s", True, self.COLORS["BLACK"])
-        speed_text = self.font.render(f"Speed: {sim_speed:.1f}x", True, self.COLORS["BLACK"])
-        count_text = self.font.render(f"Students: {student_count}, Adults: {adult_count}", True, self.COLORS["BLACK"])
-        fps_text = self.font.render(f"FPS: {fps:.1f}", True, self.COLORS["BLACK"])
+        panel_color = self.COLORS["PANEL_BG"]
+        text_color = self.COLORS["TEXT_COLOR"]
+        padding = 10
+        v_padding = 5
 
-        shooter_color = self.COLORS["ALERT"] if shooter_count > 0 else self.COLORS["BLACK"]
-        shooter_text = self.font.render(f"Active Shooters: {shooter_count}", True, shooter_color)
+        # --- Top Info Panel ---
+        panel_height = self.ui_line_height + v_padding * 2
+        panel_surface = pygame.Surface((self.screen_width, panel_height), pygame.SRCALPHA)
+        panel_surface.fill(panel_color)
 
-        vision_status = "ON" if show_vision else "OFF"
-        safe_status = "ON" if show_safe_areas else "OFF"
-        viz_status_text = self.font.render(
-            f"Vision Cone: {vision_status} | Safe Areas: {safe_status}",
-            True, self.COLORS["BLACK"]
-        )
+        time_str = f"Time: {simulation_time:.1f}s"
+        speed_str = f"Speed: {sim_speed:.1f}x"
+        agent_str = f"Agents: {student_count} S / {adult_count} A"
+        shooter_str = f"Shooters: {shooter_count}"
+        fps_str = f"FPS: {fps:.0f}"
+        vision_str = f"Vision Cone [V]: {'ON' if show_vision else 'OFF'}"
 
-        # Draw UI elements in top-left
-        text_y = 10
-        line_height = 30
-        self.screen.blit(time_text, (10, text_y))
-        text_y += line_height
-        self.screen.blit(speed_text, (10, text_y))
-        text_y += line_height
-        self.screen.blit(count_text, (10, text_y))
-        text_y += line_height
-        self.screen.blit(shooter_text, (10, text_y))
-        text_y += line_height
-        self.screen.blit(fps_text, (10, text_y))
-        text_y += line_height
-        self.screen.blit(viz_status_text, (10, text_y))
+        time_surf = self.ui_font.render(time_str, True, text_color)
+        speed_surf = self.ui_font.render(speed_str, True, text_color)
+        agent_surf = self.ui_font.render(agent_str, True, text_color)
+        shooter_color = self.COLORS["ALERT"] if shooter_count > 0 else text_color
+        shooter_surf = self.ui_font.render(shooter_str, True, shooter_color)
+        fps_surf = self.ui_font.render(fps_str, True, text_color)
+        vision_surf = self.ui_font.render(vision_str, True, text_color)
 
-        # Draw help text at bottom
-        self.screen.blit(self.help_text, (10, self.screen_height - 50))
-        self.screen.blit(self.viz_help_text, (10, self.screen_height - 25))
+        x_pos = padding
+        y_pos = v_padding
 
-    def render_frame(self, simulation_time, sim_speed, fps=0, show_vision=False, show_safe_areas=False):
+        panel_surface.blit(time_surf, (x_pos, y_pos))
+        x_pos += time_surf.get_width() + padding * 2
+        panel_surface.blit(speed_surf, (x_pos, y_pos))
+        x_pos += speed_surf.get_width() + padding * 2
+        panel_surface.blit(agent_surf, (x_pos, y_pos))
+        x_pos += agent_surf.get_width() + padding * 2
+        panel_surface.blit(shooter_surf, (x_pos, y_pos))
+
+        vision_x = self.screen_width - vision_surf.get_width() - padding
+        fps_x = vision_x - fps_surf.get_width() - padding * 2
+        panel_surface.blit(fps_surf, (fps_x, y_pos))
+        panel_surface.blit(vision_surf, (vision_x, y_pos))
+
+        self.screen.blit(panel_surface, (0, 0))
+
+        # --- Bottom Help Text Panel ---
+        # Use the pre-rendered help lines from __init__
+        help_panel_height = (len(self.rendered_help_lines) * self.help_line_height) + v_padding * 2
+        help_panel_y = self.screen_height - help_panel_height
+        help_panel_surface = pygame.Surface((self.screen_width, help_panel_height), pygame.SRCALPHA)
+        help_panel_surface.fill(panel_color)
+
+        help_y = v_padding
+        for line_surf in self.rendered_help_lines:
+            help_panel_surface.blit(line_surf, (padding, help_y))
+            help_y += self.help_line_height
+
+        self.screen.blit(help_panel_surface, (0, help_panel_y))
+
+
+    def render_frame(self, simulation_time, sim_speed, fps=0, show_vision=False, show_ui=True):
         """Render a complete frame of the simulation."""
-        # Draw background with walls and doors
+        # Draw cached background (walls, doors)
         self.screen.blit(self.background, (0, 0))
 
-        # Check for shooter status change
+        # Check for shooter status change for alert
         self.check_shooter_status()
 
-        # Draw safe spawn areas if enabled
-        if show_safe_areas:
-            self.visualize_safe_spawn_areas()
-
-        # Draw exits
+        # Draw dynamic elements
         self.draw_exits()
+        self.draw_agents() # Handles different radii now
+        self.draw_shots()
 
-        # Draw all agents
-        self.draw_agents()
-
-        # Draw vision cone if enabled
+        # Draw visualizations (if enabled)
         if show_vision:
             self.visualize_vision_cone()
 
-        # Draw active shots
-        self.draw_shots()
+        # Draw UI elements only if enabled
+        if show_ui:
+            self.draw_ui(simulation_time, sim_speed, fps, show_vision)
 
-        # Draw UI elements
-        self.draw_ui(simulation_time, sim_speed, fps, show_vision, show_safe_areas)
-
-        # Draw alert if active
+        # Draw alert message if active (always on top if active)
         self.draw_alert()
 
-        # Update display
+        # Update the full display
         pygame.display.flip()
+
+    def close(self):
+        """Clean up Pygame resources."""
+        pygame.font.quit()
+        pygame.display.quit()
