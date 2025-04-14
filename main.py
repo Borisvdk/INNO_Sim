@@ -66,7 +66,8 @@ def run_single_visual_simulation(run_number):
         n_adults=config.INITIAL_ADULTS,
         width=config.SIM_WIDTH,
         height=config.SIM_HEIGHT,
-        grid_file=config.GRID_FILE # Use config for grid file path
+        armed_adults_count=config.ARMED_ADULTS_COUNT,
+        grid_file=config.GRID_FILE
     )
 
     # Initialize Pygame and sound (inside the function for clean runs)

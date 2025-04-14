@@ -15,7 +15,7 @@ FPS_LIMIT = 60                      # Target frame rate for visualization
 FPS_SAMPLE_COUNT = 30               # Number of frames to average for FPS display
 
 # --- Simulation Control ---
-NUM_VISUAL_BATCH_RUNS = 5          # Default number of simulations to run sequentially
+NUM_VISUAL_BATCH_RUNS = 30          # Default number of simulations to run sequentially
 TERMINATION_DELAY_AFTER_SHOOTER = 60.0 # Seconds after last shooter is neutralized to end sim
 PAUSE_ON_TERMINATION = 1.5          # Seconds to pause visualization when simulation ends
 PAUSE_BETWEEN_RUNS = 2.0            # Seconds to pause between sequential simulation runs
@@ -56,7 +56,7 @@ WALL_AVOIDANCE_STRENGTH = 50.0      # Factor for agent-wall avoidance force
 SHOOTER_CHECK_INTERVAL = 10.0       # Seconds between checks for random shooter emergence
 SHOOTER_EMERGENCE_PROBABILITY = 0.01# Probability per check that an agent becomes a shooter
 
-ADULT_WEAPON_PROBABILITY = 0.33     # Probability an adult starts with / acquires a weapon
+ARMED_ADULTS_COUNT = 5              # Amount of adults starting with / acquires a weapon
 SHOOTING_INTERVAL = 2.0             # Seconds between shots for a shooter
 SHOOTING_RANGE = 100.0              # Max distance a shooter can fire (units)
 HIT_PROBABILITY = 0.7               # Base probability to hit target within range
@@ -68,7 +68,7 @@ STEAL_PROBABILITY = 0.001           # Probability per step for a student to atte
 ADULT_RESPONSE_DELAY_RANGE = (0.5, 2.0) # (min, max) seconds delay before adult reacts to threat (used in adult agent logic)
 AWARENESS_RANGE = 200                # Distance to passively become aware of shooter/threat (used in agent logic)
 SCREAM_RADIUS = 30                  # Distance a student's scream travels, potentially alerting others
-ENABLE_STUDENT_SCREAMING = False     # Whether students scream when in emergency (affects awareness spread)
+ENABLE_STUDENT_SCREAMING = True     # Whether students scream when in emergency (affects awareness spread)
 
 # --- Visualization ---
 VISION_CONE_ANGLE = 120             # Field of view angle for shooter visualization (degrees)
