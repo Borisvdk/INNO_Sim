@@ -8,7 +8,7 @@ from visualization import Visualizer
 import config
 
 # --- CSV Configuration ---
-CSV_FILENAME = "simulation_data.csv"
+CSV_FILENAME = "simulation_data_0%_Scream.csv"
 # Ensure these match the keys returned by model.collect_step_data(), plus 'Run'
 FIELDNAMES = [
     'Run', 'Time', 'Living Students', 'Living Adults',

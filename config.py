@@ -16,7 +16,8 @@ FPS_SAMPLE_COUNT = 30               # Number of frames to average for FPS displa
 
 # --- Simulation Control ---
 NUM_VISUAL_BATCH_RUNS = 30          # Default number of simulations to run sequentially
-TERMINATION_DELAY_AFTER_SHOOTER = 60.0 # Seconds after last shooter is neutralized to end sim
+INITIAL_SHOOTER_SPAWN_TIME = 5.0      # Seconds after start to spawn the first shooter (-1 to disable)
+TERMINATION_DELAY_AFTER_SHOOTER = 60.0 # Seconds after first shooter appears to end sim
 PAUSE_ON_TERMINATION = 1.5          # Seconds to pause visualization when simulation ends
 PAUSE_BETWEEN_RUNS = 2.0            # Seconds to pause between sequential simulation runs
 
@@ -56,7 +57,7 @@ WALL_AVOIDANCE_STRENGTH = 50.0      # Factor for agent-wall avoidance force
 SHOOTER_CHECK_INTERVAL = 10.0       # Seconds between checks for random shooter emergence
 SHOOTER_EMERGENCE_PROBABILITY = 0.01# Probability per check that an agent becomes a shooter
 
-ARMED_ADULTS_COUNT = 5              # Amount of adults starting with / acquires a weapon
+ARMED_ADULTS_COUNT = 0             # Amount of adults starting with / acquires a weapon
 SHOOTING_INTERVAL = 2.0             # Seconds between shots for a shooter
 SHOOTING_RANGE = 100.0              # Max distance a shooter can fire (units)
 HIT_PROBABILITY = 0.7               # Base probability to hit target within range

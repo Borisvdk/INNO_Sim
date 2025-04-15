@@ -128,6 +128,8 @@ class SchoolModel:
         self.shooter_emergence_probability = config.SHOOTER_EMERGENCE_PROBABILITY
         self.spatial_grid = SpatialGrid(width, height, cell_size=max(config.STUDENT_RADIUS, config.ADULT_RADIUS) * 4)
 
+        self.initial_shooter_spawn_time = config.INITIAL_SHOOTER_SPAWN_TIME
+        self.initial_shooter_spawned = False  # Flag to ensure it only happens once
         self.shooter_appeared_flag = False
         self.first_shooter_appearance_time = 0.0
         self.terminate_simulation = False
@@ -236,8 +238,6 @@ class SchoolModel:
     def step_continuous(self, dt):
         """Perform a continuous time step with delta time dt."""
         if self.terminate_simulation:
-            # Optional: print something here or do nothing extra.
-            # The main loop will check the `should_terminate` property.
             return  # Stop further processing of this step
 
         self.simulation_time += dt
@@ -246,6 +246,30 @@ class SchoolModel:
         if not self.has_active_shooter and self.simulation_time - self.last_shooter_check_time >= self.shooter_check_interval:
             self.last_shooter_check_time = self.simulation_time
             self._check_for_shooter_emergence()  # This function might set has_active_shooter to True
+
+        # Check for initial timed shooter spawn
+        if not self.initial_shooter_spawned and \
+                0 <= self.initial_shooter_spawn_time <= self.simulation_time:
+            print(f"--- Time reached ({self.simulation_time:.2f}s). Attempting to spawn initial timed shooter... ---")
+            # Use the existing manual add function to handle the logic
+            success = self.add_manual_shooter()
+            if success:
+                print(f"--- Initial timed shooter successfully spawned at time {self.simulation_time:.2f}s. ---")
+            else:
+                # This might happen if there are no eligible students left at the exact spawn time
+                print(
+                    f"--- WARNING: Failed to spawn initial timed shooter at {self.simulation_time:.2f}s (no eligible students?). ---")
+            # Set the flag regardless of success to prevent repeated attempts/logging
+            self.initial_shooter_spawned = True
+
+        # Check for random shooter emergence (only if timed spawn is disabled or already happened)
+        if (self.initial_shooter_spawn_time < 0 or self.initial_shooter_spawned) and \
+                not self.has_active_shooter and \
+                self.simulation_time - self.last_shooter_check_time >= self.shooter_check_interval:
+            self.last_shooter_check_time = self.simulation_time
+            # Only check for random emergence if configured probability is > 0
+            if config.SHOOTER_EMERGENCE_PROBABILITY > 0:
+                self._check_for_shooter_emergence()
 
         # Check if a shooter has appeared
         if self.has_active_shooter and not self.shooter_appeared_flag:
