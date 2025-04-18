@@ -2,25 +2,25 @@ import pygame
 import math
 import heapq
 
-# Initialize Pygame
+
 pygame.init()
 
-# Screen dimensions
+
 WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("School Evacuation Simulation")
 
-# Colors
+
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GRAY = (200, 200, 200)
 
-# Simulation settings
+
 FPS = 60
 AGENT_SPEED = 2
 
-# Walls setup (x, y, width, height)
+
 walls = [
     pygame.Rect(200, 150, 400, 20),
     pygame.Rect(200, 300, 20, 200),
@@ -33,20 +33,29 @@ walls = [
     pygame.Rect(150, 400, 150, 20),
 ]
 
-# Student agent class
+
 class Student:
+    """Represents a student agent in the simplified A* example simulation."""
     def __init__(self, x, y):
+        """
+        Initialize a Student for the A* example.
+
+        Args:
+            x (int): Initial x-coordinate.
+            y (int): Initial y-coordinate.
+        """
         self.x = x
         self.y = y
         self.path = []
         self.reached_exit = False
 
     def move(self):
+        """Move the student along its calculated path."""
         if self.path:
             target_x, target_y = self.path[0]
             dx, dy = target_x - self.x, target_y - self.y
             dist = math.hypot(dx, dy)
-            
+
             if dist < AGENT_SPEED:
                 self.x, self.y = target_x, target_y
                 self.path.pop(0)
@@ -55,16 +64,42 @@ class Student:
                 self.y += AGENT_SPEED * dy / dist
 
     def draw(self):
+        """Draw the student on the screen."""
         pygame.draw.circle(screen, RED, (int(self.x), int(self.y)), 5)
 
     def at_exit(self):
+        """
+        Check if the student has reached the boundary considered an exit.
+
+        Returns:
+            bool: True if the student is at or beyond the screen boundaries.
+        """
         return self.x <= 0 or self.x >= WIDTH or self.y <= 0 or self.y >= HEIGHT
 
 def astar(start, goal, walls):
-    """Finds the shortest path from start to goal using A* while avoiding walls."""
-    
+    """
+    Finds the shortest path from start to goal using the A* algorithm, avoiding walls.
+
+    Args:
+        start (tuple): The starting (x, y) coordinates.
+        goal (tuple): The target (x, y) coordinates.
+        walls (list): A list of pygame.Rect objects representing obstacles.
+
+    Returns:
+        list: A list of (x, y) tuples representing the path, or an empty list if no path is found.
+    """
+
     def heuristic(a, b):
-        """Euclidean distance heuristic function."""
+        """
+        Calculate the Euclidean distance heuristic between two points.
+
+        Args:
+            a (tuple): The first point (x, y).
+            b (tuple): The second point (x, y).
+
+        Returns:
+            float: The Euclidean distance.
+        """
         return math.hypot(a[0] - b[0], a[1] - b[1])
 
     open_set = []
@@ -76,7 +111,6 @@ def astar(start, goal, walls):
     while open_set:
         _, current = heapq.heappop(open_set)
 
-        # Stop if we are close enough to the goal
         if heuristic(current, goal) < 10:
             path = []
             while current in came_from:
@@ -85,8 +119,7 @@ def astar(start, goal, walls):
             path.reverse()
             return path
 
-        # Generate more neighbor points with finer granularity
-        step_size = 5  # Reduced step size for better accuracy
+        step_size = 5
         directions = [
             (step_size, 0), (-step_size, 0), (0, step_size), (0, -step_size),
             (step_size, step_size), (-step_size, step_size),
@@ -96,16 +129,13 @@ def astar(start, goal, walls):
         for dx, dy in directions:
             neighbor = (current[0] + dx, current[1] + dy)
 
-            # Ensure neighbor is inside screen boundaries
             if not (0 <= neighbor[0] <= WIDTH and 0 <= neighbor[1] <= HEIGHT):
                 continue
 
-            # Collision check with walls
             point_rect = pygame.Rect(neighbor[0] - 2, neighbor[1] - 2, 4, 4)
             if any(point_rect.colliderect(wall) for wall in walls):
                 continue
 
-            # Update pathfinding scores
             tentative_g_score = g_score[current] + heuristic(current, neighbor)
 
             if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
@@ -114,11 +144,11 @@ def astar(start, goal, walls):
                 f_score[neighbor] = tentative_g_score + heuristic(neighbor, goal)
                 heapq.heappush(open_set, (f_score[neighbor], neighbor))
 
-    return []  # No valid path found
+    return []
 
 def main():
+    """Main function to run the simple A* demonstration."""
     clock = pygame.time.Clock()
-    # Added more students at various positions
     students = [
         Student(100, 100),
         Student(150, 200),
@@ -129,7 +159,7 @@ def main():
         Student(250, 400),
         Student(500, 150),
     ]
-    
+
     emergency = False
 
     running = True
@@ -142,10 +172,10 @@ def main():
                 emergency = True
                 for student in students:
                     exits = [
-                        (student.x, 0),              # Top edge
-                        (student.x, HEIGHT),         # Bottom edge
-                        (0, student.y),              # Left edge
-                        (WIDTH, student.y)          # Right edge
+                        (student.x, 0),
+                        (student.x, HEIGHT),
+                        (0, student.y),
+                        (WIDTH, student.y)
                     ]
                     closest_exit = min(exits, key=lambda ex: math.hypot(student.x - ex[0], student.y - ex[1]))
                     path = astar((student.x, student.y), closest_exit, walls)
@@ -163,7 +193,7 @@ def main():
             student.move()
             student.draw()
             if student.at_exit():
-                students.remove(student)  # Remove student who exits
+                students.remove(student)
 
         pygame.display.flip()
 

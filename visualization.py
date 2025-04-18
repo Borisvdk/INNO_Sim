@@ -6,52 +6,54 @@ import config
 
 
 class Visualizer:
-    """Visualization system for the school simulation model."""
+    """Handles rendering the simulation state to a Pygame window."""
 
     def __init__(self, model, screen_width=config.SCREEN_WIDTH, screen_height=config.SCREEN_HEIGHT):
-        """Initialize the visualization system."""
+        """
+        Initialize the visualization system.
+
+        Args:
+            model (SchoolModel): The simulation model instance to visualize.
+            screen_width (int, optional): The width of the display window in pixels. Defaults to config.SCREEN_WIDTH.
+            screen_height (int, optional): The height of the display window in pixels. Defaults to config.SCREEN_HEIGHT.
+        """
         self.model = model
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.scale_factor = min(screen_width / model.width, screen_height / model.height)
 
-        # Initialize Pygame screen
         pygame.display.init()
         pygame.font.init()
         self.screen = pygame.display.set_mode((screen_width, screen_height))
         pygame.display.set_caption("School Safety Simulation")
 
-        # Use colors from config
         self.COLORS = config.COLORS
-        # Add default colors if missing
         defaults = {
             "BROWN": (139, 69, 19),
-            "PANEL_BG": (50, 50, 50, 180), # Semi-transparent dark gray
-            "TEXT_COLOR": (240, 240, 240), # Light gray/white
+            "PANEL_BG": (50, 50, 50, 180),
+            "TEXT_COLOR": (240, 240, 240),
             "ALERT": (255, 0, 0),
             "WHITE": (255, 255, 255),
             "BLACK": (0, 0, 0),
             "BLUE": (0, 0, 255),
-            "RED": (200, 0, 0), # Slightly less bright red for adults
-            "GREEN": (0, 150, 0), # Shooter color
-            "ARMED_STUDENT": (100, 100, 255), # Lighter blue
-            "ARMED_ADULT": (255, 255, 0), # Yellow
-            "AWARE_ADULT": (255, 100, 0), # Orange
-            "FLEEING_STUDENT": (0, 100, 255), # Darker blue
-            "SCREAM_FILL": (255, 165, 0, 30), # Fainter orange fill
-            "SCREAM_OUTLINE": (255, 165, 0, 60), # Fainter orange outline
+            "RED": (200, 0, 0),
+            "GREEN": (0, 150, 0),
+            "ARMED_STUDENT": (100, 100, 255),
+            "ARMED_ADULT": (255, 255, 0),
+            "AWARE_ADULT": (255, 100, 0),
+            "FLEEING_STUDENT": (0, 100, 255),
+            "SCREAM_FILL": (255, 165, 0, 30),
+            "SCREAM_OUTLINE": (255, 165, 0, 60),
             "SHOT": (255, 0, 0),
-            "EXIT_FILL": (0, 200, 0, 80), # Semi-transparent green
-            "EXIT_BORDER": (0, 100, 0, 150) # Darker green border
+            "EXIT_FILL": (0, 200, 0, 80),
+            "EXIT_BORDER": (0, 100, 0, 150)
         }
         for key, value in defaults.items():
             self.COLORS.setdefault(key, value)
 
 
-        # Create cached background with walls and doors
         self._create_cached_background()
 
-        # Prepare fonts for UI elements (smaller sizes)
         self.ui_font_size = 18
         self.help_font_size = 16
         self.alert_font_size = 28
@@ -68,7 +70,6 @@ class Visualizer:
         self.ui_line_height = self.ui_font.get_linesize()
         self.help_line_height = self.help_font.get_linesize()
 
-        # Pre-render help text for performance (updated with UI toggle)
         self.help_text_lines = [
             "Controls: ↑/↓: Speed | Space: Reset Speed | S: Add Student | A: Add Adult | X: Add Shooter",
             "Toggles: V: Vision Cone | H: Hide/Show UI"
@@ -77,7 +78,6 @@ class Visualizer:
             self.help_font.render(line, True, self.COLORS["TEXT_COLOR"]) for line in self.help_text_lines
         ]
 
-        # Alert system variables
         self.show_alert = False
         self.alert_message = ""
         self.alert_start_time = 0
@@ -85,42 +85,56 @@ class Visualizer:
         self.last_has_shooter = False
 
     def _create_cached_background(self):
-        """Create a cached background with static elements (walls and doors)."""
+        """Create a static background surface containing walls and doors for efficient redrawing."""
         self.background = pygame.Surface((self.screen_width, self.screen_height))
         self.background.fill(self.COLORS["WHITE"])
 
-        # Draw walls
         for wall_rect in self.model.walls:
             scaled_rect = self._scale_rect(wall_rect)
             pygame.draw.rect(self.background, self.COLORS["BLACK"], scaled_rect)
 
-        # Draw doors
         door_color = self.COLORS["BROWN"]
         for door_rect in self.model.doors:
             scaled_rect = self._scale_rect(door_rect)
             pygame.draw.rect(self.background, door_color, scaled_rect)
 
     def _scale_rect(self, rect):
-        """Scale a rect from model coordinates to screen coordinates."""
+        """
+        Scale a pygame.Rect from model coordinates to screen coordinates.
+
+        Args:
+            rect (pygame.Rect): The rectangle in model coordinates.
+
+        Returns:
+            pygame.Rect: The rectangle scaled to screen coordinates.
+        """
         return pygame.Rect(
             int(rect.left * self.scale_factor),
             int(rect.top * self.scale_factor),
-            max(1, int(rect.width * self.scale_factor + 0.5)), # Ensure width is at least 1
-            max(1, int(rect.height * self.scale_factor + 0.5)) # Ensure height is at least 1
+            max(1, int(rect.width * self.scale_factor + 0.5)),
+            max(1, int(rect.height * self.scale_factor + 0.5))
         )
 
     def _model_to_screen_pos(self, pos):
-        """Convert model coordinates to screen coordinates."""
+        """
+        Convert a position tuple from model coordinates to screen coordinates.
+
+        Args:
+            pos (tuple): The (x, y) position in model coordinates.
+
+        Returns:
+            tuple: The (x, y) position in screen coordinates.
+        """
         return int(pos[0] * self.scale_factor), int(pos[1] * self.scale_factor)
 
     def show_shooter_alert(self):
-        """Display an active shooter alert."""
+        """Activate the visual alert message indicating an active shooter."""
         self.show_alert = True
         self.alert_message = "⚠️ ACTIVE SHOOTER ALERT ⚠️"
         self.alert_start_time = time.time()
 
     def check_shooter_status(self):
-        """Check if shooter status has changed and show alert if needed."""
+        """Check if the model's active shooter status has changed and trigger the alert if necessary."""
         current_shooter_status = self.model.has_active_shooter
         if current_shooter_status and not self.last_has_shooter:
             self.show_shooter_alert()
@@ -128,7 +142,13 @@ class Visualizer:
 
     def visualize_vision_cone(self, vision_angle=config.VISION_CONE_ANGLE,
                               max_vision_distance=config.MAX_VISION_DISTANCE):
-        """Visualize the vision cone for active shooters."""
+        """
+        Draw the vision cones for all active shooters on a temporary transparent surface.
+
+        Args:
+            vision_angle (float, optional): The angle of the vision cone in degrees. Defaults to config.VISION_CONE_ANGLE.
+            max_vision_distance (float, optional): The maximum range of the vision cone in model units. Defaults to config.MAX_VISION_DISTANCE.
+        """
         shooters = self.model.active_shooters
         if not shooters:
             return
@@ -174,7 +194,7 @@ class Visualizer:
         self.screen.blit(temp_surface, (0, 0))
 
     def draw_alert(self):
-        """Draw alert message on screen with pulsing effect."""
+        """Draw the active shooter alert message box if it's currently active."""
         if not self.show_alert:
             return
 
@@ -208,7 +228,7 @@ class Visualizer:
         self.screen.blit(alert_surface, (alert_x, alert_y))
 
     def draw_agents(self):
-        """Draw all agents with appropriate radii and status indicators."""
+        """Draw all agents onto the screen with appropriate colors and indicators."""
         overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
 
         for agent in self.model.schedule:
@@ -217,17 +237,15 @@ class Visualizer:
             pos = agent.position
             screen_pos = self._model_to_screen_pos(pos)
 
-            # Determine base radius based on agent type
             if agent.agent_type == "student":
                 base_radius = config.STUDENT_RADIUS
             elif agent.agent_type == "adult":
                 base_radius = config.ADULT_RADIUS
             else:
-                base_radius = config.STUDENT_RADIUS # Default if type unknown
+                base_radius = config.STUDENT_RADIUS
 
             radius = max(1, int(base_radius * self.scale_factor))
 
-            # Determine agent color
             if getattr(agent, "is_shooter", False):
                  color = self.COLORS["GREEN"]
             elif agent.agent_type == "student":
@@ -245,12 +263,10 @@ class Visualizer:
                 else:
                     color = self.COLORS["RED"]
             else:
-                 color = self.COLORS["BLACK"] # Default fallback
+                 color = self.COLORS["BLACK"]
 
-            # Draw agent circle
             pygame.draw.circle(self.screen, color, screen_pos, radius)
 
-            # Draw direction indicator if moving
             if hasattr(agent, "velocity"):
                 vx, vy = agent.velocity
                 speed_squared = vx * vx + vy * vy
@@ -263,7 +279,9 @@ class Visualizer:
                     )
                     pygame.draw.line(self.screen, self.COLORS["BLACK"], screen_pos, end_pos, 1)
 
-            # Draw scream radius for students in emergency
+            # Draw scream radius - Visual indicator of the "Talking by Doing" (screaming) range.
+            # The act of being 'in_emergency' (Doing) causes a scream (implied Talking),
+            # which can cause other agents to become aware (Doing).
             if (config.ENABLE_STUDENT_SCREAMING and agent.agent_type == "student"
                     and getattr(agent, "in_emergency", False)):
                 scream_radius = int(config.SCREAM_RADIUS * self.scale_factor)
@@ -276,7 +294,7 @@ class Visualizer:
         self.screen.blit(overlay, (0, 0))
 
     def draw_shots(self):
-        """Draw active gunshots."""
+        """Draw lines representing active gunshots that haven't expired."""
         current_time = self.model.simulation_time
         shot_duration = config.SHOT_VISUALIZATION_DURATION
 
@@ -295,7 +313,7 @@ class Visualizer:
             self.model.active_shots = valid_shots
 
     def draw_exits(self):
-        """Draw exit areas."""
+        """Draw rectangles representing the designated exit areas."""
         exit_fill = self.COLORS["EXIT_FILL"]
         exit_border = self.COLORS["EXIT_BORDER"]
 
@@ -305,10 +323,15 @@ class Visualizer:
             pygame.draw.rect(self.screen, exit_border, scaled_rect, 1)
 
     def draw_ui(self, simulation_time, sim_speed, fps, show_vision):
-        """Draw user interface elements in compact panels."""
-        # This function now assumes it's only called when show_ui is True.
-        # The conditional check happens in render_frame.
+        """
+        Draw the user interface panels (info and help text) onto the screen.
 
+        Args:
+            simulation_time (float): The current simulation time.
+            sim_speed (float): The current simulation speed multiplier.
+            fps (float): The current rendering frames per second.
+            show_vision (bool): Whether the vision cone visualization is active.
+        """
         student_count = 0
         adult_count = 0
         for agent in self.model.schedule:
@@ -321,7 +344,6 @@ class Visualizer:
         padding = 10
         v_padding = 5
 
-        # --- Top Info Panel ---
         panel_height = self.ui_line_height + v_padding * 2
         panel_surface = pygame.Surface((self.screen_width, panel_height), pygame.SRCALPHA)
         panel_surface.fill(panel_color)
@@ -359,8 +381,6 @@ class Visualizer:
 
         self.screen.blit(panel_surface, (0, 0))
 
-        # --- Bottom Help Text Panel ---
-        # Use the pre-rendered help lines from __init__
         help_panel_height = (len(self.rendered_help_lines) * self.help_line_height) + v_padding * 2
         help_panel_y = self.screen_height - help_panel_height
         help_panel_surface = pygame.Surface((self.screen_width, help_panel_height), pygame.SRCALPHA)
@@ -375,33 +395,35 @@ class Visualizer:
 
 
     def render_frame(self, simulation_time, sim_speed, fps=0, show_vision=False, show_ui=True):
-        """Render a complete frame of the simulation."""
-        # Draw cached background (walls, doors)
+        """
+        Render a complete frame of the simulation state to the display.
+
+        Args:
+            simulation_time (float): Current time in the simulation.
+            sim_speed (float): Current simulation speed multiplier.
+            fps (float, optional): Current frames per second estimate. Defaults to 0.
+            show_vision (bool, optional): Flag to enable shooter vision cone visualization. Defaults to False.
+            show_ui (bool, optional): Flag to enable drawing UI panels. Defaults to True.
+        """
         self.screen.blit(self.background, (0, 0))
 
-        # Check for shooter status change for alert
         self.check_shooter_status()
 
-        # Draw dynamic elements
         self.draw_exits()
-        self.draw_agents() # Handles different radii now
+        self.draw_agents()
         self.draw_shots()
 
-        # Draw visualizations (if enabled)
         if show_vision:
             self.visualize_vision_cone()
 
-        # Draw UI elements only if enabled
         if show_ui:
             self.draw_ui(simulation_time, sim_speed, fps, show_vision)
 
-        # Draw alert message if active (always on top if active)
         self.draw_alert()
 
-        # Update the full display
         pygame.display.flip()
 
     def close(self):
-        """Clean up Pygame resources."""
+        """Clean up Pygame resources (font and display)."""
         pygame.font.quit()
         pygame.display.quit()

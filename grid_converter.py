@@ -1,15 +1,23 @@
 import json
 import numpy as np
-import pygame # <-- Import pygame here
+import pygame
 
-# Define colors used in the grid file
+
 BLACK = [0, 0, 0]
 WHITE = [255, 255, 255]
-GREEN = [0, 255, 0] # <-- Define Green for exits
-RED = [255, 0, 0] 
+GREEN = [0, 255, 0]
+RED = [255, 0, 0]
 
 def load_grid_from_json(file_path):
-    """Load a grid from a JSON file."""
+    """
+    Load a grid representing the environment layout from a JSON file.
+
+    Args:
+        file_path (str): The path to the JSON file containing the grid data.
+
+    Returns:
+        list: A 2D list representing the grid, or None if loading fails.
+    """
     try:
         with open(file_path, 'r') as f:
             return json.load(f)
@@ -22,67 +30,61 @@ def load_grid_from_json(file_path):
 
 def convert_grid_to_elements(grid, scale_factor=1.0):
     """
-    Convert a grid of RGB values to wall, exit, and door definitions.
+    Convert a grid of RGB color values into lists of pygame Rects for walls, exits, and doors.
 
     Args:
-        grid: 3D list/array where colors define element types.
-        scale_factor: Factor to scale coordinates by.
+        grid (list): A 2D list where each cell contains an RGB color list [R, G, B].
+        scale_factor (float, optional): A factor to scale the coordinates and dimensions
+                                        of the resulting Rects. Defaults to 1.0.
 
     Returns:
-        Tuple: (list_of_wall_rects, list_of_exit_rects, list_of_door_rects)
-               Rects are pygame.Rect objects.
+        tuple: A tuple containing three lists: (list_of_wall_rects, list_of_exit_rects, list_of_door_rects).
+               Rects are pygame.Rect objects. Returns ([], [], []) if the input grid is None.
     """
     if grid is None:
-        return [], [], [] # Return three empty lists
+        return [], [], []
 
     height = len(grid)
     width = len(grid[0])
     walls = []
     exits = []
-    doors = [] # <-- Add list for doors
+    doors = []
 
     for y in range(height):
         for x in range(width):
             cell_color = grid[y][x]
-            # Ensure cell_color is a list/tuple of 3 integers
             if not isinstance(cell_color, (list, tuple)) or len(cell_color) != 3:
-                 # print(f"Warning: Invalid cell format at ({x},{y}): {cell_color}. Skipping.")
-                 continue # Skip malformed cells silently or log warning
-
-            # Convert color list to tuple for direct comparison if necessary
-            # Although direct list comparison usually works
-            # cell_color_tuple = tuple(cell_color)
+                 continue
 
             rect = pygame.Rect(
                 int(x * scale_factor),
                 int(y * scale_factor),
-                int(scale_factor + 0.5), # Add 0.5 before int() for better rounding
+                int(scale_factor + 0.5),
                 int(scale_factor + 0.5)
             )
 
-            # Compare with list literals directly
             if cell_color == BLACK:
                 walls.append(rect)
             elif cell_color == GREEN:
                 exits.append(rect)
-            elif cell_color == RED: # <-- Check for doors
+            elif cell_color == RED:
                 doors.append(rect)
 
-    return walls, exits, doors # <-- Return doors
+    return walls, exits, doors
 
 
 def integrate_grid_into_simulation(grid_file, simulation_width, simulation_height):
     """
-    Load a grid file and convert it to walls, exits, and doors for the simulation.
+    Load a grid file, convert its elements, and scale them to fit simulation dimensions.
 
     Args:
-        grid_file: Path to the grid.json file
-        simulation_width: Width of the simulation area
-        simulation_height: Height of the simulation area
+        grid_file (str): Path to the grid.json file.
+        simulation_width (int): The target width of the simulation area.
+        simulation_height (int): The target height of the simulation area.
 
     Returns:
-        Tuple: (list_of_wall_rects, list_of_exit_rects, list_of_door_rects)
-               Returns ([], [], []) if grid loading fails.
+        tuple: A tuple containing three lists: (list_of_wall_rects, list_of_exit_rects, list_of_door_rects).
+               Returns ([], [], []) if grid loading or processing fails.
     """
     grid = load_grid_from_json(grid_file)
     if grid is None:
@@ -99,8 +101,7 @@ def integrate_grid_into_simulation(grid_file, simulation_width, simulation_heigh
     scale_y = simulation_height / grid_height
     avg_scale = (scale_x + scale_y) / 2.0
 
-    # Convert grid to walls, exits, and doors
     walls, exits, doors = convert_grid_to_elements(grid, avg_scale)
 
     print(f"Loaded {len(walls)} wall rects, {len(exits)} exit rects, and {len(doors)} door rects from grid.")
-    return walls, exits, doors # <-- Return all three lists
+    return walls, exits, doors

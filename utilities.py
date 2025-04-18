@@ -3,96 +3,123 @@ import math
 
 def line_segments_intersect(x1, y1, x2, y2, x3, y3, x4, y4):
     """
-    Check if two line segments intersect.
+    Check if two finite line segments intersect.
+
+    Args:
+        x1, y1: Coordinates of the first point of the first segment.
+        x2, y2: Coordinates of the second point of the first segment.
+        x3, y3: Coordinates of the first point of the second segment.
+        x4, y4: Coordinates of the second point of the second segment.
+
+    Returns:
+        bool: True if the segments intersect, False otherwise.
     """
-    # Calculate directions
     d1x = x2 - x1
     d1y = y2 - y1
     d2x = x4 - x3
     d2y = y4 - y3
 
-    # Calculate the determinant
     determinant = d1x * d2y - d1y * d2x
 
-    # If determinant is very close to zero, lines are parallel
     if abs(determinant) < 1e-8:
         return False
 
-    # Calculate parameters for the intersection point
     s = ((x1 - x3) * d2y - (y1 - y3) * d2x) / determinant
     t = ((x1 - x3) * d1y - (y1 - y3) * d1x) / determinant
 
-    # Check if the intersection is within both line segments
     return 0 <= s <= 1 and 0 <= t <= 1
 
 
 def point_in_rectangle(x, y, rect_x1, rect_y1, rect_x2, rect_y2):
-    """Check if a point is inside a rectangle."""
+    """
+    Check if a point (x, y) lies within a rectangle defined by its corners.
+
+    Args:
+        x, y: Coordinates of the point.
+        rect_x1, rect_y1: Coordinates of the top-left corner of the rectangle.
+        rect_x2, rect_y2: Coordinates of the bottom-right corner of the rectangle.
+
+    Returns:
+        bool: True if the point is inside the rectangle (inclusive), False otherwise.
+    """
     return (rect_x1 <= x <= rect_x2 and rect_y1 <= y <= rect_y2)
 
 
 def line_intersects_rectangle(line_x1, line_y1, line_x2, line_y2, wall_rect):
     """
-    Check if a line intersects with a pygame.Rect wall.
-    Uses pygame.Rect.clipline internally.
+    Check if a line segment intersects with a pygame.Rect object.
+
+    Args:
+        line_x1, line_y1: Coordinates of the first point of the line segment.
+        line_x2, line_y2: Coordinates of the second point of the line segment.
+        wall_rect (pygame.Rect): The rectangle object to check against.
+
+    Returns:
+        bool: True if the line segment intersects the rectangle, False otherwise.
     """
     try:
-        # clipline returns the clipped line segment within the rect if it intersects,
-        # or an empty tuple () if it doesn't.
         clipped_line = wall_rect.clipline(line_x1, line_y1, line_x2, line_y2)
-        return bool(clipped_line) # True if clipline didn't return empty tuple
+        return bool(clipped_line)
     except TypeError:
-        # Handle potential errors if coordinates are not numbers
         print(f"Warning: TypeError in clipline with line ({line_x1},{line_y1})-({line_x2},{line_y2}) and rect {wall_rect}")
         return False
 
 
-def has_line_of_sight(start_pos, end_pos, obstacles): # Changed walls to obstacles
+def has_line_of_sight(start_pos, end_pos, obstacles):
     """
-    Check if there's a line of sight between start_pos and end_pos, avoiding obstacles.
+    Check if there is an unobstructed line of sight between two points, considering obstacles.
 
     Args:
-        start_pos: Tuple (x, y) of the starting position
-        end_pos: Tuple (x, y) of the ending position
-        obstacles: List of pygame.Rect objects representing vision-blocking elements (walls and doors).
+        start_pos (tuple): The starting (x, y) coordinates.
+        end_pos (tuple): The ending (x, y) coordinates.
+        obstacles (list): A list of pygame.Rect objects representing vision-blocking elements.
 
     Returns:
-        True if there's a clear line of sight, False if an obstacle blocks the view
+        bool: True if there is a clear line of sight, False if an obstacle intersects the line segment.
     """
     start_x, start_y = start_pos
     end_x, end_y = end_pos
 
-    # Check each obstacle rectangle for intersection
-    for obstacle_rect in obstacles: # Iterate through combined list
+    for obstacle_rect in obstacles:
         if line_intersects_rectangle(
             start_x, start_y, end_x, end_y,
-            obstacle_rect # Pass the pygame.Rect directly
+            obstacle_rect
         ):
-            return False # Obstacle blocks line of sight
+            return False
 
-    # No obstacles block the view
     return True
 
 
 def distance_squared(pos1, pos2):
-    """Calculate squared distance between two positions"""
+    """
+    Calculate the squared Euclidean distance between two points.
+    Useful for comparisons where the exact distance is not needed, avoiding sqrt.
+
+    Args:
+        pos1 (tuple): The first point (x, y).
+        pos2 (tuple): The second point (x, y).
+
+    Returns:
+        float: The squared distance between pos1 and pos2.
+    """
     dx = pos1[0] - pos2[0]
     dy = pos1[1] - pos2[1]
     return dx * dx + dy * dy
 
 
-def cast_ray(start_pos, angle, max_distance, obstacles): # Changed walls to obstacles
+def cast_ray(start_pos, angle, max_distance, obstacles):
     """
-    Cast a ray from start_pos, checking intersections with obstacle Rects.
+    Cast a ray from a starting point in a given direction and find the first intersection point with obstacles.
 
     Args:
-        start_pos: Tuple (x, y)
-        angle: Angle in radians
-        max_distance: Maximum distance
-        obstacles: List of pygame.Rect objects for vision-blocking elements (walls and doors)
+        start_pos (tuple): The (x, y) origin of the ray.
+        angle (float): The angle of the ray in radians.
+        max_distance (float): The maximum distance the ray should travel if no obstacle is hit.
+        obstacles (list): A list of pygame.Rect objects representing potential obstacles.
 
     Returns:
-        Tuple (x, y) of the endpoint (either max_distance or collision point)
+        tuple: The (x, y) coordinates of the intersection point, or the point at max_distance
+               along the angle if no intersection occurs within that distance.
     """
     start_x, start_y = start_pos
     dx = math.cos(angle)
@@ -103,8 +130,7 @@ def cast_ray(start_pos, angle, max_distance, obstacles): # Changed walls to obst
     closest_intersection = (ray_end_x, ray_end_y)
     min_dist_sq = max_distance * max_distance
 
-    for obstacle_rect in obstacles: # Iterate through combined list
-        # Define the 4 edges of the rectangle
+    for obstacle_rect in obstacles:
         edges = [
             (obstacle_rect.topleft, obstacle_rect.topright),
             (obstacle_rect.bottomleft, obstacle_rect.bottomright),
@@ -129,31 +155,27 @@ def cast_ray(start_pos, angle, max_distance, obstacles): # Changed walls to obst
 
 def line_line_intersection(x1, y1, x2, y2, x3, y3, x4, y4):
     """
-    Calculate the intersection point of two line segments if it exists.
+    Calculate the intersection point of two line segments if it exists within both segments.
 
     Args:
-        x1, y1: First point of first line segment
-        x2, y2: Second point of first line segment
-        x3, y3: First point of second line segment
-        x4, y4: Second point of second line segment
+        x1, y1: Coordinates of the first point of the first line segment.
+        x2, y2: Coordinates of the second point of the first line segment.
+        x3, y3: Coordinates of the first point of the second line segment.
+        x4, y4: Coordinates of the second point of the second line segment.
 
     Returns:
-        Tuple (x, y) of intersection point, or None if no intersection
+        tuple: The (x, y) coordinates of the intersection point if it lies on both segments,
+               or None otherwise.
     """
-    # Calculate determinant
     den = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1)
 
-    # If lines are parallel, no intersection
     if abs(den) < 1e-8:
         return None
 
-    # Calculate line parameters
     ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / den
     ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / den
 
-    # If intersection is within both line segments
     if 0 <= ua <= 1 and 0 <= ub <= 1:
-        # Calculate intersection point
         x = x1 + ua * (x2 - x1)
         y = y1 + ua * (y2 - y1)
         return (x, y)
