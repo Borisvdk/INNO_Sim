@@ -1,0 +1,10 @@
+{
+  "parameter_grid": {
+    "students": [208],
+    "adults": [15],
+    "armed_adults": [0, 5, 15],
+    "ENABLE_STUDENT_SCREAMING": [true, false]
+  },
+  "runs_per_config": 1,
+  "sim_speed": 10
+}
